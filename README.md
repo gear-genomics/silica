@@ -12,4 +12,4 @@ Installing
 Running
 -------
 
-`./src/fmsearch -g hg19.idx.fm sequences.fasta`
+`./src/fmsearch -g hg19.fa.gz sequences.fasta`
