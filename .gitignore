@@ -1,3 +1,9 @@
+.sdsl
+.htslib
+.boost
+src/fmsearch
+src/sdslLite/
+
 # Prerequisites
 *.d
 
