@@ -1,6 +1,6 @@
 /*
 ============================================================================
-Indigo: InDel Discovery in Sanger Chromatograms
+FMsearch: FM-Index Search
 ============================================================================
 Copyright (C) 2017 Tobias Rausch
 
@@ -26,6 +26,7 @@ Contact: Tobias Rausch (rausch@embl.de)
 #include <fstream>
 
 #define BOOST_DISABLE_ASSERTS
+#include <boost/multi_array.hpp>
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
@@ -44,10 +45,16 @@ Contact: Tobias Rausch (rausch@embl.de)
 #include <sdsl/suffix_arrays.hpp>
 #include <htslib/faidx.h>
 
+#include "neighbors.h"
+#include "align.h"
+#include "needle.h"
+
 using namespace sdsl;
+using namespace fmsearch;
 
 struct Config {
   bool indel;
+  bool align;
   uint32_t kmer;
   uint32_t distance;
   std::size_t pre_context;
@@ -59,65 +66,6 @@ struct Config {
 };
 
 
-inline void
-reverseComplement(std::string& sequence) {
-  std::string rev = boost::to_upper_copy(std::string(sequence.rbegin(), sequence.rend()));
-  std::size_t i = 0;
-  for(std::string::iterator revIt = rev.begin(); revIt != rev.end(); ++revIt, ++i) {
-    switch (*revIt) {
-    case 'A': sequence[i]='T'; break;
-    case 'C': sequence[i]='G'; break;
-    case 'G': sequence[i]='C'; break;
-    case 'T': sequence[i]='A'; break;
-    case 'N': sequence[i]='N'; break;
-    default: break;
-    }
-  }
-}
-
-template<typename TAlphabet, typename TStringSet>
-inline void
-_neighbors(std::string const& query, TAlphabet const& alphabet, int32_t dist, bool indel, int32_t pos, TStringSet& strset) {
-  for(int32_t i = pos; i < (int32_t) query.size();++i) {
-    if (dist > 0) {
-      if (indel) {
-	// Insertion
-	for(typename TAlphabet::const_iterator ait = alphabet.begin(); ait != alphabet.end(); ++ait) {
-	  std::string ins("N");
-	  ins[0] = *ait;
-	  std::string newst = query.substr(0, i) + ins + query.substr(i);
-	  _neighbors(newst, alphabet, dist - 1, indel, pos, strset);
-	}
-	// Deletion
-	std::string newst = query.substr(0, i) + query.substr(i + 1);
-	_neighbors(newst, alphabet, dist - 1, indel, pos + 1, strset);
-      }
-      for(typename TAlphabet::const_iterator ait = alphabet.begin(); ait != alphabet.end(); ++ait) {
-	if (*ait != query[i]) {
-	  std::string newst(query);
-	  newst[i] = *ait;
-	  _neighbors(newst, alphabet, dist - 1, indel, pos+1, strset);
-	}
-      }
-    }
-  }
-  if ((indel) && (dist > 0)) {
-    for(typename TAlphabet::const_iterator ait = alphabet.begin(); ait != alphabet.end(); ++ait) {
-      std::string ins("N");
-      ins[0] = *ait;
-      std::string newst = query + ins;
-      strset.insert(newst);
-    }
-  }
-  strset.insert(query);
-}
-      
-
-template<typename TAlphabet, typename TStringSet>
-inline void
-neighbors(std::string const& query, TAlphabet const& alphabet, int32_t dist, bool indel, TStringSet& strset) {
-  _neighbors(query, alphabet, dist, indel, 0, strset);
-}
 
 int main(int argc, char** argv) {
   Config c;
@@ -127,7 +75,6 @@ int main(int argc, char** argv) {
   generic.add_options()
     ("help,?", "show help message")
     ("genome,g", boost::program_options::value<boost::filesystem::path>(&c.genome), "genome file")
-    ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("out.fa"), "output file")
     ;
 
   boost::program_options::options_description appr("Approximate Search Options");
@@ -135,13 +82,15 @@ int main(int argc, char** argv) {
     ("kmer,k", boost::program_options::value<uint32_t>(&c.kmer)->default_value(15), "k-mer size")
     ("maxmatches,m", boost::program_options::value<std::size_t>(&c.max_locations)->default_value(10000), "max. number of matches per k-mer")
     ("distance,d", boost::program_options::value<uint32_t>(&c.distance)->default_value(1), "neighborhood distance")
-    ("indel,n", boost::program_options::value<bool>(&c.indel)->default_value(true), "edit distance (1) or hamming distance (0)")
+    ("hamming,n", "use hamming neighborhood instead of edit distance")
     ;
 
   boost::program_options::options_description outp("Output Options");
   outp.add_options()
-    ("prefix,p", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(10), "prefix length")
-    ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(10), "suffix length")
+    ("prefix,p", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(20), "prefix length")
+    ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(20), "suffix length")
+    ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("out.fa"), "output file")
+    ("align,a", "write alignments to stderr")
     ;
     
   boost::program_options::options_description hidden("Hidden options");
@@ -166,6 +115,12 @@ int main(int argc, char** argv) {
     std::cout << visible_options << "\n";
     return -1;
   }
+
+  // Cmd switches
+  if (!vm.count("align")) c.align = false;
+  else c.align = true;
+  if (!vm.count("hamming")) c.indel = true;
+  else c.indel = false;
 
   // Show cmd
   boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
@@ -291,6 +246,37 @@ int main(int argc, char** argv) {
 	  std::string fullseq = pre + s.substr(0, m) + post;
 	  ofile << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos << " hit:(" << qhits << "," << i << ") " << itFa->first << std::endl;
 	  ofile << fullseq << std::endl;
+	  if (c.align) {
+	    typedef boost::multi_array<char, 2> TAlign;
+	    TAlign alignFwd;
+	    TAlign alignRev;
+	    AlignConfig<true, false> semiglobal;
+	    DnaScore<int> sc(5, -4, -4, -4);
+	    std::string primer = itFa->second;
+	    int32_t fwdScore = needle(primer, fullseq, alignFwd, semiglobal, sc);
+	    reverseComplement(primer);
+	    int32_t revScore = needle(primer, fullseq, alignRev, semiglobal, sc);
+	    typedef typename TAlign::index TAIndex;
+	    std::cerr << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos << " hit:(" << qhits << "," << i << ") " << itFa->first << std::endl;
+	    if (fwdScore > revScore) {
+	      std::cerr << "AlignScore (Fwd): " << fwdScore << std::endl;
+	      for(TAIndex i = 0; i < (TAIndex) alignFwd.shape()[0]; ++i) {
+		for(TAIndex j = 0; j < (TAIndex) alignFwd.shape()[1]; ++j) {
+		  std::cerr << alignFwd[i][j];
+		}
+		std::cerr << std::endl;
+	      }
+	    } else {
+	      std::cerr << "AlignScore (Rev): " << revScore << std::endl;
+	      for(TAIndex i = 0; i < (TAIndex) alignRev.shape()[0]; ++i) {
+		for(TAIndex j = 0; j < (TAIndex) alignRev.shape()[1]; ++j) {
+		  std::cerr << alignRev[i][j];
+		}
+		std::cerr << std::endl;
+	      }
+	    }
+	    std::cerr << std::endl;
+	  }	    
 	}
       }
     }
