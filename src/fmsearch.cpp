@@ -47,6 +47,9 @@ Contact: Tobias Rausch (rausch@embl.de)
 using namespace sdsl;
 
 struct Config {
+  bool indel;
+  uint32_t kmer;
+  uint32_t distance;
   std::size_t pre_context;
   std::size_t post_context;
   std::size_t max_locations;
@@ -55,6 +58,67 @@ struct Config {
   boost::filesystem::path genome;
 };
 
+
+inline void
+reverseComplement(std::string& sequence) {
+  std::string rev = boost::to_upper_copy(std::string(sequence.rbegin(), sequence.rend()));
+  std::size_t i = 0;
+  for(std::string::iterator revIt = rev.begin(); revIt != rev.end(); ++revIt, ++i) {
+    switch (*revIt) {
+    case 'A': sequence[i]='T'; break;
+    case 'C': sequence[i]='G'; break;
+    case 'G': sequence[i]='C'; break;
+    case 'T': sequence[i]='A'; break;
+    case 'N': sequence[i]='N'; break;
+    default: break;
+    }
+  }
+}
+
+template<typename TAlphabet, typename TStringSet>
+inline void
+_neighbors(std::string const& query, TAlphabet const& alphabet, int32_t dist, bool indel, int32_t pos, TStringSet& strset) {
+  for(int32_t i = pos; i < (int32_t) query.size();++i) {
+    if (dist > 0) {
+      if (indel) {
+	// Insertion
+	for(typename TAlphabet::const_iterator ait = alphabet.begin(); ait != alphabet.end(); ++ait) {
+	  std::string ins("N");
+	  ins[0] = *ait;
+	  std::string newst = query.substr(0, i) + ins + query.substr(i);
+	  _neighbors(newst, alphabet, dist - 1, indel, pos, strset);
+	}
+	// Deletion
+	std::string newst = query.substr(0, i) + query.substr(i + 1);
+	_neighbors(newst, alphabet, dist - 1, indel, pos + 1, strset);
+      }
+      for(typename TAlphabet::const_iterator ait = alphabet.begin(); ait != alphabet.end(); ++ait) {
+	if (*ait != query[i]) {
+	  std::string newst(query);
+	  newst[i] = *ait;
+	  _neighbors(newst, alphabet, dist - 1, indel, pos+1, strset);
+	}
+      }
+    }
+  }
+  if ((indel) && (dist > 0)) {
+    for(typename TAlphabet::const_iterator ait = alphabet.begin(); ait != alphabet.end(); ++ait) {
+      std::string ins("N");
+      ins[0] = *ait;
+      std::string newst = query + ins;
+      strset.insert(newst);
+    }
+  }
+  strset.insert(query);
+}
+      
+
+template<typename TAlphabet, typename TStringSet>
+inline void
+neighbors(std::string const& query, TAlphabet const& alphabet, int32_t dist, bool indel, TStringSet& strset) {
+  _neighbors(query, alphabet, dist, indel, 0, strset);
+}
+
 int main(int argc, char** argv) {
   Config c;
   
@@ -62,13 +126,24 @@ int main(int argc, char** argv) {
   boost::program_options::options_description generic("Generic options");
   generic.add_options()
     ("help,?", "show help message")
-    ("genome,g", boost::program_options::value<boost::filesystem::path>(&c.genome), "Genome file")
+    ("genome,g", boost::program_options::value<boost::filesystem::path>(&c.genome), "genome file")
     ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("out.fa"), "output file")
-    ("prefix,p", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(10), "prefix length")
-    ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(10), "suffix length")
-    ("maxmatches,m", boost::program_options::value<std::size_t>(&c.max_locations)->default_value(5), "max. number of matches")
     ;
 
+  boost::program_options::options_description appr("Approximate Search Options");
+  appr.add_options()
+    ("kmer,k", boost::program_options::value<uint32_t>(&c.kmer)->default_value(15), "k-mer size")
+    ("maxmatches,m", boost::program_options::value<std::size_t>(&c.max_locations)->default_value(10000), "max. number of matches per k-mer")
+    ("distance,d", boost::program_options::value<uint32_t>(&c.distance)->default_value(1), "neighborhood distance")
+    ("indel,n", boost::program_options::value<bool>(&c.indel)->default_value(true), "edit distance (1) or hamming distance (0)")
+    ;
+
+  boost::program_options::options_description outp("Output Options");
+  outp.add_options()
+    ("prefix,p", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(10), "prefix length")
+    ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(10), "suffix length")
+    ;
+    
   boost::program_options::options_description hidden("Hidden options");
   hidden.add_options()
     ("input-file", boost::program_options::value<boost::filesystem::path>(&c.infile), "seq.fasta")
@@ -78,9 +153,9 @@ int main(int argc, char** argv) {
   pos_args.add("input-file", -1);
 
   boost::program_options::options_description cmdline_options;
-  cmdline_options.add(generic).add(hidden);
+  cmdline_options.add(generic).add(appr).add(outp).add(hidden);
   boost::program_options::options_description visible_options;
-  visible_options.add(generic);
+  visible_options.add(generic).add(appr).add(outp);
   boost::program_options::variables_map vm;
   boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(cmdline_options).positional(pos_args).run(), vm);
   boost::program_options::notify(vm);
@@ -167,40 +242,56 @@ int main(int argc, char** argv) {
     }
   }
 
+  // Define alphabet
+  typedef std::set<char> TAlphabet;
+  char tmp[] = {'A', 'C', 'G', 'T'};
+  TAlphabet alphabet(tmp, tmp + sizeof(tmp) / sizeof(tmp[0]));
+
   // Query FM-Index
   std::ofstream ofile(c.outfile.string().c_str());
   now = boost::posix_time::second_clock::local_time();
   std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Query FM-Index" << std::endl;
   for(TInputFasta::const_iterator itFa = infa.begin(); itFa != infa.end(); ++itFa) {
-    std::string query = itFa->second;
-    std::size_t m = query.size();
-    std::size_t occs = sdsl::count(fm_index, query.begin(), query.end());
-    if (occs > 0) {
-      auto locations = locate(fm_index, query.begin(), query.begin() + m);
-      std::sort(locations.begin(), locations.end());
-      for(std::size_t i = 0, pre_extract = c.pre_context, post_extract = c.post_context; i < std::min(occs, c.max_locations); ++i) {
-	int64_t bestPos = locations[i];
-	int64_t cumsum = 0;
-	uint32_t refIndex = 0;
-	for(; bestPos >= cumsum + seqlen[refIndex]; ++refIndex) cumsum += seqlen[refIndex];
-	uint32_t chrpos = bestPos - cumsum;
-	if (pre_extract > locations[i]) {
-	  pre_extract = locations[i];
+    std::string qr = itFa->second;
+    if (qr.size() < c.kmer) continue;
+    qr = qr.substr(qr.size() - c.kmer);
+    typedef std::set<std::string> TStringSet;
+    TStringSet strset;
+    neighbors(qr, alphabet, c.distance, c.indel, strset);
+    reverseComplement(qr);
+    neighbors(qr, alphabet, c.distance, c.indel, strset);
+    int32_t qhits = 0;
+    for(TStringSet::iterator its = strset.begin(); its != strset.end(); ++its, ++qhits) {
+      std::string query(*its);
+      std::size_t m = query.size();
+      std::size_t occs = sdsl::count(fm_index, query.begin(), query.end());
+      if (occs > 0) {
+	auto locations = locate(fm_index, query.begin(), query.begin() + m);
+	std::sort(locations.begin(), locations.end());
+	for(std::size_t i = 0, pre_extract = c.pre_context, post_extract = c.post_context; i < std::min(occs, c.max_locations); ++i) {
+	  int64_t bestPos = locations[i];
+	  int64_t cumsum = 0;
+	  uint32_t refIndex = 0;
+	  for(; bestPos >= cumsum + seqlen[refIndex]; ++refIndex) cumsum += seqlen[refIndex];
+	  uint32_t chrpos = bestPos - cumsum;
+	  if (pre_extract > locations[i]) {
+	    pre_extract = locations[i];
+	  }
+	  if (locations[i]+m+post_extract > fm_index.size()) {
+	    post_extract = fm_index.size() - locations[i] - m;
+	  }
+	  auto s = extract(fm_index, locations[i]-pre_extract, locations[i]+m+post_extract-1);
+	  std::string pre = s.substr(0, pre_extract);
+	  s = s.substr(pre_extract);
+	  if (pre.find_last_of('\n') != std::string::npos) {
+	    pre = pre.substr(pre.find_last_of('\n')+1);
+	  }
+	  std::string post = s.substr(m);
+	  post = post.substr(0, post.find_first_of('\n'));
+	  std::string fullseq = pre + s.substr(0, m) + post;
+	  ofile << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos << " hit:(" << qhits << "," << i << ") " << itFa->first << std::endl;
+	  ofile << fullseq << std::endl;
 	}
-	if (locations[i]+m+post_extract > fm_index.size()) {
-	  post_extract = fm_index.size() - locations[i] - m;
-	}
-	auto s = extract(fm_index, locations[i]-pre_extract, locations[i]+m+post_extract-1);
-	std::string pre = s.substr(0, pre_extract);
-	s = s.substr(pre_extract);
-	if (pre.find_last_of('\n') != std::string::npos) {
-	  pre = pre.substr(pre.find_last_of('\n')+1);
-	}
-	std::string post = s.substr(m);
-	post = post.substr(0, post.find_first_of('\n'));
-	std::string fullseq = pre + s.substr(0, m) + post;
-	ofile << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos << " hit:" << (i+1) << " " << itFa->first << std::endl;
-	ofile << fullseq << std::endl;
       }
     }
   }
