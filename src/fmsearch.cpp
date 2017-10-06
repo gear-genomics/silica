@@ -71,7 +71,6 @@ int main(int argc, char** argv) {
   boost::filesystem::path exepath = boost::filesystem::system_complete(argv[0]).parent_path();
   std::string cfgpath = exepath.string() + "/primer3_config/";
   
-   int tmp_ret;
    primer3thal::thal_args a;
    primer3thal::thal_results o;
    primer3thal::set_thal_default_args(&a);
@@ -94,23 +93,16 @@ int main(int argc, char** argv) {
    primer3thal::oligo2 = (unsigned char*) p2.c_str();
 
    // read thermodynamic parameters 
-   tmp_ret = primer3thal::get_thermodynamic_values(cfgpath.c_str(), &o);
-
-   if (tmp_ret) {
-     fprintf(stderr, "%s\n", o.msg);
-     exit(-1);
-   }
+   primer3thal::get_thermodynamic_values(cfgpath.c_str());
 
    // execute thermodynamical alignemnt 
-   primer3thal::thal(primer3thal::oligo1, primer3thal::oligo2, &a, &o);
-
-   // encountered error during thermodynamical calc 
-   if (o.temp == primer3thal::THAL_ERROR_SCORE) {
-      tmp_ret = fprintf(stderr, "Error: %s\n", o.msg);
-      exit(-1);
+   bool thalsuccess = primer3thal::thal(primer3thal::oligo1, primer3thal::oligo2, &a, &o);
+   if ((!thalsuccess) || (o.temp == primer3thal::THAL_ERROR_SCORE)) {
+     std::cerr << "Error during thermodynamical calculation!" << std::endl;
+     return -1;
    }
    
-   printf("Temp: %f\n",o.temp);
+   printf("Temp: %f\n", o.temp);
 
    primer3thal::destroy_thal_structures();
 

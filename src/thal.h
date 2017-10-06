@@ -41,7 +41,6 @@
 
 
 #include "limits.h"
-#include "errno.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
@@ -103,16 +102,9 @@ namespace primer3thal
 # define HEND5(i) hend5[i]
 #endif
 
-#define CHECK_ERROR(COND,MSG) if (COND) { strcpy(o->msg, MSG); errno = 0; longjmp(_jmp_buf, 1); }
-#define THAL_IO_ERROR(f) { sprintf(o->msg, "Unable to open file %s", f); longjmp(_jmp_buf, 1); }
-
 #define bpIndx(a, b) BPI[a][b] /* for traceing matrix BPI */
 #define atPenaltyS(a, b) atpS[a][b]
 #define atPenaltyH(a, b) atpH[a][b]
-
-#define STR(X) #X
-#define LONG_SEQ_ERR_STR(MAX_LEN) "Target sequence length > maximum allowed (" STR(MAX_LEN) ") in thermodynamic alignment"
-#define XSTR(X) STR(X)
 
 #define SMALL_NON_ZERO 0.000001
 #define DBL_EQ(X,Y) (((X) - (Y)) < (SMALL_NON_ZERO) ? (1) : (2)) /* 1 when numbers are equal */
@@ -136,9 +128,7 @@ const double ABSOLUTE_ZERO = 273.15;
 const double TEMP_KELVIN = 310.15;
 const int MAX_LOOP = 30; /* the maximum size of loop that can be calculated; for larger loops formula must be implemented */
 const int MIN_LOOP = 0;
-//static const char BASES[5] = {'A', 'C', 'G', 'T', 'N'}; /* bases to be considered - N is every symbol that is not A, G, C,$
-//						  */
-//static const char BASE_PAIRS[4][4] = {"A-T", "C-G", "G-C", "T-A" }; /* allowed basepairs */
+
 /* matrix for allowed; bp 0 - no bp, watson crick bp - 1 */
 static const int BPI[5][5] =  {
      {0, 0, 0, 1, 0}, /* A, C, G, T, N; */
@@ -176,7 +166,6 @@ typedef struct {
 
 /* Structure for receiving results from the thermodynamic alignment calculation */
 typedef struct {
-   char msg[255];
    double temp;
    int align_end_1;
    int align_end_2;
@@ -241,7 +230,6 @@ static struct triloop* triloopEntropies = NULL; /* ther penalties for given tril
 static struct triloop* triloopEnthalpies = NULL; /* ther penalties for given triloop seq-s */
 static struct tetraloop* tetraloopEntropies = NULL; /* ther penalties for given tetraloop seq-s */
 static struct tetraloop* tetraloopEnthalpies = NULL; /* ther penalties for given tetraloop seq-s */
-static jmp_buf _jmp_buf;
 
 
 static int 
@@ -489,7 +477,7 @@ readTLoop(FILE *file, char *s, double *v, int triloop)
 
 
 static FILE* 
-openParamFile(const char* fname, thal_results* o)
+openParamFile(const char* fname)
 {
    FILE* file;
    char* paramdir;
@@ -499,10 +487,7 @@ openParamFile(const char* fname, thal_results* o)
       strcpy(paramdir, parampath);
       strcat(paramdir, fname);
       if (!(file = fopen(paramdir, "rt"))) {
-#ifdef DEBUG
-	 perror(paramdir);
-#endif
-	 THAL_IO_ERROR(paramdir);
+	fputs("Error opening params file\n", stderr);
       }
       free(paramdir);
    }
@@ -510,12 +495,12 @@ openParamFile(const char* fname, thal_results* o)
 }
 
 static void 
-getStack(double stackEntropies[5][5][5][5], double stackEnthalpies[5][5][5][5], thal_results* o)
+getStack(double stackEntropies[5][5][5][5], double stackEnthalpies[5][5][5][5])
 {
    int i, j, ii, jj;
    FILE *sFile, *hFile;
-   sFile = openParamFile("stack.ds", o);
-   hFile = openParamFile("stack.dh", o);
+   sFile = openParamFile("stack.ds");
+   hFile = openParamFile("stack.dh");
    for (i = 0; i < 5; ++i) {
       for (ii = 0; ii < 5; ++ii) {
 	 for (j = 0; j < 5; ++j) {
@@ -540,12 +525,12 @@ getStack(double stackEntropies[5][5][5][5], double stackEnthalpies[5][5][5][5], 
 }
 
 static void 
-getStackint2(double stackint2Entropies[5][5][5][5], double stackint2Enthalpies[5][5][5][5], thal_results* o)
+getStackint2(double stackint2Entropies[5][5][5][5], double stackint2Enthalpies[5][5][5][5])
 {
    int i, j, ii, jj;
    FILE *sFile, *hFile;
-   sFile = openParamFile("stackmm.ds", o);
-   hFile = openParamFile("stackmm.dh", o);
+   sFile = openParamFile("stackmm.ds");
+   hFile = openParamFile("stackmm.dh");
    for (i = 0; i < 5; ++i) {
       for (ii = 0; ii < 5; ++ii) {
 	 for (j = 0; j < 5; ++j) {
@@ -571,13 +556,12 @@ getStackint2(double stackint2Entropies[5][5][5][5], double stackint2Enthalpies[5
 
 
 static void 
-getDangle(double dangleEntropies3[5][5][5], double dangleEnthalpies3[5][5][5], double dangleEntropies5[5][5][5],
-	  double dangleEnthalpies5[5][5][5], thal_results* o)
+getDangle(double dangleEntropies3[5][5][5], double dangleEnthalpies3[5][5][5], double dangleEntropies5[5][5][5], double dangleEnthalpies5[5][5][5])
 {
    int i, j, k;
    FILE *sFile, *hFile;
-   sFile = openParamFile("dangle.ds", o);
-   hFile = openParamFile("dangle.dh", o);
+   sFile = openParamFile("dangle.ds");
+   hFile = openParamFile("dangle.dh");
    for (i = 0; i < 5; ++i)
      for (j = 0; j < 5; ++j)
        for (k = 0; k < 5; ++k) {
@@ -621,12 +605,12 @@ getDangle(double dangleEntropies3[5][5][5], double dangleEnthalpies3[5][5][5], d
 
 static void 
 getLoop(double hairpinLoopEntropies[30], double interiorLoopEntropies[30], double bulgeLoopEntropies[30],
-	double hairpinLoopEnthalpies[30], double interiorLoopEnthalpies[30], double bulgeLoopEnthalpies[30], thal_results* o)
+	double hairpinLoopEnthalpies[30], double interiorLoopEnthalpies[30], double bulgeLoopEnthalpies[30])
 {
    int k;
    FILE *sFile, *hFile;
-   sFile = openParamFile("loops.ds", o);
-   hFile = openParamFile("loops.dh", o);
+   sFile = openParamFile("loops.ds");
+   hFile = openParamFile("loops.dh");
    for (k = 0; k < 30; ++k) {
       readLoop(sFile, &interiorLoopEntropies[k], &bulgeLoopEntropies[k], &hairpinLoopEntropies[k]);
       readLoop(hFile, &interiorLoopEnthalpies[k], &bulgeLoopEnthalpies[k], &hairpinLoopEnthalpies[k]);
@@ -636,12 +620,12 @@ getLoop(double hairpinLoopEntropies[30], double interiorLoopEntropies[30], doubl
 }
 
 static void 
-getTstack(double tstackEntropies[5][5][5][5], double tstackEnthalpies[5][5][5][5], thal_results* o)
+getTstack(double tstackEntropies[5][5][5][5], double tstackEnthalpies[5][5][5][5])
 {
    int i1, j1, i2, j2;
    FILE *sFile, *hFile;
-   sFile = openParamFile("tstack_tm_inf.ds", o);
-   hFile = openParamFile("tstack.dh", o);
+   sFile = openParamFile("tstack_tm_inf.ds");
+   hFile = openParamFile("tstack.dh");
    for (i1 = 0; i1 < 5; ++i1)
      for (i2 = 0; i2 < 5; ++i2)
        for (j1 = 0; j1 < 5; ++j1)
@@ -665,13 +649,13 @@ getTstack(double tstackEntropies[5][5][5][5], double tstackEnthalpies[5][5][5][5
 }
 
 static void 
-getTstack2(double tstack2Entropies[5][5][5][5], double tstack2Enthalpies[5][5][5][5], thal_results* o)
+getTstack2(double tstack2Entropies[5][5][5][5], double tstack2Enthalpies[5][5][5][5])
 {
 
    int i1, j1, i2, j2;
    FILE *sFile, *hFile;
-   sFile = openParamFile("tstack2.ds", o);
-   hFile = openParamFile("tstack2.dh", o);
+   sFile = openParamFile("tstack2.ds");
+   hFile = openParamFile("tstack2.dh");
    for (i1 = 0; i1 < 5; ++i1)
      for (i2 = 0; i2 < 5; ++i2)
        for (j1 = 0; j1 < 5; ++j1)
@@ -695,12 +679,12 @@ getTstack2(double tstack2Entropies[5][5][5][5], double tstack2Enthalpies[5][5][5
 }
 
 static void 
-getTriloop(struct triloop** triloopEntropies, struct triloop** triloopEnthalpies, int* num, thal_results* o)
+getTriloop(struct triloop** triloopEntropies, struct triloop** triloopEnthalpies, int* num)
 {
    FILE *sFile, *hFile;
    int i, size;
    double value;
-   sFile = openParamFile("triloop.ds", o);
+   sFile = openParamFile("triloop.ds");
    *num = 0;
    size = 16;
    *triloopEntropies = (struct triloop*) safe_calloc(16, sizeof(struct triloop));
@@ -718,7 +702,7 @@ getTriloop(struct triloop** triloopEntropies, struct triloop** triloopEnthalpies
 
    fclose(sFile);
 
-   hFile = openParamFile("triloop.dh", o);
+   hFile = openParamFile("triloop.dh");
    *num = 0;
    size = 16;
    *triloopEnthalpies = (struct triloop*) safe_calloc(16, sizeof(struct triloop));
@@ -738,13 +722,13 @@ getTriloop(struct triloop** triloopEntropies, struct triloop** triloopEnthalpies
 }
 
 static void 
-getTetraloop(struct tetraloop** tetraloopEntropies, struct tetraloop** tetraloopEnthalpies, int* num, thal_results* o)
+getTetraloop(struct tetraloop** tetraloopEntropies, struct tetraloop** tetraloopEnthalpies, int* num)
 {
 
    FILE *sFile, *hFile;
    int i, size;
    double value;
-   sFile = openParamFile("tetraloop.ds", o);
+   sFile = openParamFile("tetraloop.ds");
    *num = 0;
    size = 16;
    *tetraloopEntropies = (struct tetraloop*) safe_calloc(16, sizeof(struct tetraloop));
@@ -761,7 +745,7 @@ getTetraloop(struct tetraloop** tetraloopEntropies, struct tetraloop** tetraloop
    *tetraloopEntropies = (struct tetraloop*) safe_realloc(*tetraloopEntropies, *num * sizeof(struct tetraloop));
    fclose(sFile);
 
-   hFile = openParamFile("tetraloop.dh", o);
+   hFile = openParamFile("tetraloop.dh");
    *num = 0;
    size = 16;
    *tetraloopEnthalpies = (struct tetraloop*) safe_calloc(16, sizeof(struct tetraloop));
@@ -2199,7 +2183,7 @@ traceback(int i, int j, int* ps1, int* ps2, int maxLoop)
    free(SH);
 }
 
-static void 
+inline bool
 drawDimer(int* ps1, int* ps2, double temp, double H, double S, int temponly, double t37, thal_results *o)
 {
    int i, j, k, numSS1, numSS2, N;
@@ -2211,8 +2195,8 @@ drawDimer(int* ps1, int* ps2, double temp, double H, double S, int temponly, dou
 	 printf("No predicted secondary structures for given sequences\n");
       }
       o->temp = 0.0; /* lets use generalization here; this should rather be very negative value */
-      strcpy(o->msg, "No predicted sec struc for given seq");
-      return;
+      std::cerr << "No predicted sec struc for given seq" << std::endl;
+      return false;
    } else {
       N=0;
       for(i=0;i<len1;i++){
@@ -2234,7 +2218,7 @@ drawDimer(int* ps1, int* ps2, double temp, double H, double S, int temponly, dou
 		(double) S, (double) H, (double) G, (double) t);
       } else {
 	 o->temp = (double) t;
-	 return;
+	 return true;
       }
    }
 
@@ -2321,10 +2305,10 @@ drawDimer(int* ps1, int* ps2, double temp, double H, double S, int temponly, dou
    free(duplex[2]);
    free(duplex[3]);
 
-   return;
+   return true;
 }
 
-static void 
+inline bool
 drawHairpin(int* bp, double mh, double ms, int temponly, double temp, thal_results *o)
 {
    /* Plain text */
@@ -2339,7 +2323,8 @@ drawHairpin(int* bp, double mh, double ms, int temponly, double temp, thal_resul
 #endif
       } else {
 	 o->temp = 0.0; /* lets use generalization here */
-	 strcpy(o->msg, "No predicted sec struc for given seq\n");
+	 std::cerr << "No predicted sec struc for given seq" << std::endl;
+	 return false;
       }
    } else {
       if(temponly == 0) {
@@ -2360,7 +2345,7 @@ drawHairpin(int* bp, double mh, double ms, int temponly, double temp, thal_resul
 		len1, (double) ms, (double) mh, (double) mg, (double) t);
       } else {
 	 o->temp = (double) t;
-	 return;
+	 return true;
       }
    }
    /* plain-text output */
@@ -2382,7 +2367,7 @@ drawHairpin(int* bp, double mh, double ms, int temponly, double temp, thal_resul
    for(i = 0; i < len1; ++i) printf("%c",asciiRow[i]);
    printf("\nSTR\t%s\n", oligo1);
    free(asciiRow);
-   return;
+   return true;
 }
 
 
@@ -2391,27 +2376,21 @@ drawHairpin(int* bp, double mh, double ms, int temponly, double temp, thal_resul
    on error. The thermodynamic values are stored in multiple static
    variables. */
 int 
-get_thermodynamic_values(const char* path, thal_results *o)
+get_thermodynamic_values(const char* path)
 {
-
-  if (setjmp(_jmp_buf) != 0) {
-     return -1;
-  }
-
   parampath = (char*) safe_malloc((strlen(path) + 1) * sizeof(char));
   strcpy(parampath, path);
 
-  getStack(stackEntropies, stackEnthalpies, o);
+  getStack(stackEntropies, stackEnthalpies);
   /* verifyStackTable(stackEntropies, "entropy");
      verifyStackTable(stackEnthalpies, "enthalpy"); */ /* this is for code debugging */
-  getStackint2(stackint2Entropies, stackint2Enthalpies, o);
-  getDangle(dangleEntropies3, dangleEnthalpies3, dangleEntropies5, dangleEnthalpies5, o);
-  getLoop(hairpinLoopEntropies, interiorLoopEntropies, bulgeLoopEntropies, hairpinLoopEnthalpies,
-	  interiorLoopEnthalpies, bulgeLoopEnthalpies, o);
-  getTstack(tstackEntropies, tstackEnthalpies, o);
-  getTstack2(tstack2Entropies, tstack2Enthalpies, o);
-  getTriloop(&triloopEntropies, &triloopEnthalpies, &numTriloops, o);
-  getTetraloop(&tetraloopEntropies, &tetraloopEnthalpies, &numTetraloops, o);
+  getStackint2(stackint2Entropies, stackint2Enthalpies);
+  getDangle(dangleEntropies3, dangleEnthalpies3, dangleEntropies5, dangleEnthalpies5);
+  getLoop(hairpinLoopEntropies, interiorLoopEntropies, bulgeLoopEntropies, hairpinLoopEnthalpies, interiorLoopEnthalpies, bulgeLoopEnthalpies);
+  getTstack(tstackEntropies, tstackEnthalpies);
+  getTstack2(tstack2Entropies, tstack2Enthalpies);
+  getTriloop(&triloopEntropies, &triloopEnthalpies, &numTriloops);
+  getTetraloop(&tetraloopEntropies, &tetraloopEnthalpies, &numTetraloops);
   /* getting the AT-penalties */
   tableStartATS(AT_S, atpS);
   tableStartATH(AT_H, atpH);
@@ -2431,12 +2410,8 @@ destroy_thal_structures()
 
 /* central method: execute all sub-methods for calculating secondary
    structure for dimer or for monomer */
-void 
-thal(const unsigned char *oligo_f, 
-     const unsigned char *oligo_r, 
-     const thal_args *a, 
-     thal_results *o)
-{
+inline bool
+thal(const unsigned char *oligo_f, const unsigned char *oligo_r, const thal_args *a, thal_results *o) {
    double* SH;
    int i, j;
    int len_f, len_r;
@@ -2449,60 +2424,60 @@ thal(const unsigned char *oligo_f,
    enthalpyDPT = entropyDPT = NULL;
    numSeq1 = numSeq2 = NULL;
    oligo1 = oligo2 = NULL;
-   strcpy(o->msg, "");
    o->temp = THAL_ERROR_SCORE;
    errno = 0; 
 
-   if (setjmp(_jmp_buf) != 0) {
-     o->temp = THAL_ERROR_SCORE;
-     return;  /* If we get here, that means we returned via a
-                 longjmp.  In this case errno might be ENOMEM,
-		 but not necessarily. */
+   if (NULL == oligo_f) {
+     std::cerr << "NULL first sequence" << std::endl;
+     return false;
    }
-
-   CHECK_ERROR(NULL == oligo_f, "NULL first sequence");
-   CHECK_ERROR(NULL == oligo_r, "NULL second sequence");
+   if (NULL == oligo_r) {
+     std::cerr << "NULL second sequence" << std::endl;
+     return false;
+   }
    len_f = length_unsig_char(oligo_f);
    len_r = length_unsig_char(oligo_r);
+   if ((len_f > THAL_MAX_ALIGN) && (len_r > THAL_MAX_ALIGN)) {
+     std::cerr << "Both sequences longer than " << THAL_MAX_ALIGN << " for thermodynamic alignment" << std::endl;
+     return false;
+   }
+   if (len_f > THAL_MAX_SEQ) {
+     std::cerr << "Target sequence length > maximum allowed!" << std::endl;
+     return false;
+   }
+   if (len_r > THAL_MAX_SEQ) {
+     std::cerr << "Target sequence length > maximum allowed!" << std::endl;
+     return false;
+   }
 
-   /*CHECK_ERROR(1==len_f, "Length 1 first sequence");
-   CHECK_ERROR(1==len_r, "Length 1 second sequence"); */
-   /* The following error messages will be seen by end users and will
-      not be easy to understand. */
-   CHECK_ERROR((len_f > THAL_MAX_ALIGN) && (len_r > THAL_MAX_ALIGN),
-	       "Both sequences longer than " XSTR(THAL_MAX_ALIGN)
-               " for thermodynamic alignment");
-   CHECK_ERROR((len_f > THAL_MAX_SEQ), 
-	       LONG_SEQ_ERR_STR(THAL_MAX_SEQ) " (1)");
-   CHECK_ERROR((len_r > THAL_MAX_SEQ), 
-	       LONG_SEQ_ERR_STR(THAL_MAX_SEQ) " (2)");
-
-   CHECK_ERROR(NULL == a,  "NULL 'in' pointer");
-   if (NULL == o) return; /* Leave it to the caller to crash */
-   CHECK_ERROR(a->type != thal_any
-	       && a->type != thal_end1
-	       && a->type != thal_end2
-	       && a->type != thal_hairpin,
-	       "Illegal type");
+   if (NULL == a) {
+     std::cerr << "NULL 'in' pointer" << std::endl;
+     return false;
+   }
+   if (NULL == o) return false; /* Leave it to the caller to crash */
+   if (a->type != thal_any && a->type != thal_end1 && a->type != thal_end2 && a->type != thal_hairpin) {
+     std::cerr << "Illegal type" << std::endl;
+     return false;
+   }
    o->align_end_1 = -1;
    o->align_end_2 = -1;
    if ('\0' == oligo_f[0]) {
-      strcpy(o->msg, "Empty first sequence");
-      o->temp = 0.0;
-      return;
+     std::cerr << "Empty first sequence" << std::endl;
+     o->temp = 0.0;
+     return false;
    }
    if ('\0' == oligo_r[0]) {
-      strcpy(o->msg, "Empty second sequence");
-      o->temp = 0.0;
-      return;
+     std::cerr << "Empty second sequence" << std::endl;
+     o->temp = 0.0;
+     return false;
    }
    if (0 == len_f) {
       o->temp = 0.0;
-      return;
+      return false;
    }
    if (0 == len_r) {
       o->temp = 0.0;
-      return;
+      return false;
    }
    if(a->type!=3) {
       oligo1 = (unsigned char*) safe_malloc((len_f + 1) * sizeof(unsigned char));
@@ -2544,10 +2519,10 @@ thal(const unsigned char *oligo_f,
       oligo2=NULL;
       oligo2=&oligo2_rev[0];
    } else {
-      strcpy(o->msg, "Wrong alignment type!");
-      o->temp = THAL_ERROR_SCORE;
-      errno=0;
-      return;
+     std::cerr << "Wrong alignment type!" << std::endl;
+     o->temp = THAL_ERROR_SCORE;
+     errno=0;
+     return false;
    }
    len1 = length_unsig_char(oligo1);
    len2 = length_unsig_char(oligo2);
@@ -2584,12 +2559,12 @@ thal(const unsigned char *oligo_f,
       if(isFinite(mh)) {
 	 tracebacku(bp, a->maxLoop);
 	 /* traceback for unimolecular structure */
-	 drawHairpin(bp, mh, ms, a->temponly,a->temp, o); /* if temponly=1 then return after printing basic therm data */
+	 if (!drawHairpin(bp, mh, ms, a->temponly,a->temp, o)) return false; /* if temponly=1 then return after printing basic therm data */
       } else if(a->temponly==0) {
 	    fputs("No secondary structure could be calculated\n",stderr);
       }
 
-      if(o->temp==-_INFINITY && (!strcmp(o->msg, ""))) o->temp=0.0;
+      if (o->temp==-_INFINITY) o->temp=0.0;
       free(bp);
       free(enthalpyDPT);
       free(entropyDPT);
@@ -2599,7 +2574,6 @@ thal(const unsigned char *oligo_f,
       free(hend5);
       free(oligo1);
       free(oligo2);
-      return;
    } else if(a->type!=4) { /* Hybridization of two moleculs */
       len3 = len2;
       enthalpyDPT = safe_recalloc(enthalpyDPT, len1, len2); /* dyn. programming table for dS and dH */
@@ -2661,7 +2635,7 @@ thal(const unsigned char *oligo_f,
 	ps2[j] = 0;
       if(isFinite(EnthalpyDPT(bestI, bestJ))){
 	 traceback(bestI, bestJ, ps1, ps2, a->maxLoop);
-	 drawDimer(ps1, ps2, SHleft, dH, dS, a->temponly,a->temp, o);
+	 if (!drawDimer(ps1, ps2, SHleft, dH, dS, a->temponly,a->temp, o)) return false;
 	 o->align_end_1=bestI;
 	 o->align_end_2=bestJ;
       } else  {
@@ -2677,11 +2651,10 @@ thal(const unsigned char *oligo_f,
       free(numSeq1);
       free(numSeq2);
       free(oligo1);
-      return;
    }
-   return;
+   return true;
 }
-/*** END thal() ***/
+
 
 /* Set default args */
 void 
