@@ -68,50 +68,7 @@ struct Config {
 
 int main(int argc, char** argv) {
   Config c;
-  boost::filesystem::path exepath = boost::filesystem::system_complete(argv[0]).parent_path();
-  std::string cfgpath = exepath.string() + "/primer3_config/";
-  
-   primer3thal::thal_args a;
-   primer3thal::thal_results o;
-   primer3thal::set_thal_default_args(&a);
-   a.temponly=1;
-   a.type = primer3thal::thal_end1;
-
-// PCR Parameters to hand over - all Double
-   a.mv = 50.0;
-   a.dv =  1.5;
-   a.dna_conc = 50.0;
-   a.dntp = 0.6;
-
-   // Temp to calc thermodynamic parameters
-   a.temp = 50.0 + primer3thal::ABSOLUTE_ZERO;
-
-   std::string p1("ggtcaatgcttcctgtgagc");
-   std::string p2("aaaagctcacaggaagcattgaccaaaa");
-
-   primer3thal::oligo1 = (unsigned char*) p1.c_str();
-   primer3thal::oligo2 = (unsigned char*) p2.c_str();
-
-   // read thermodynamic parameters 
-   primer3thal::get_thermodynamic_values(cfgpath.c_str());
-
-   // execute thermodynamical alignemnt 
-   bool thalsuccess = primer3thal::thal(primer3thal::oligo1, primer3thal::oligo2, &a, &o);
-   if ((!thalsuccess) || (o.temp == primer3thal::THAL_ERROR_SCORE)) {
-     std::cerr << "Error during thermodynamical calculation!" << std::endl;
-     return -1;
-   }
-   
-   printf("Temp: %f\n", o.temp);
-
-   primer3thal::destroy_thal_structures();
-
-
-
-
-
-
-  // Parameter
+  // CMD Parameter
   boost::program_options::options_description generic("Generic options");
   generic.add_options()
     ("help,?", "show help message")
@@ -128,8 +85,8 @@ int main(int argc, char** argv) {
 
   boost::program_options::options_description outp("Output Options");
   outp.add_options()
-    ("prefix,p", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(20), "prefix length")
-    ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(20), "suffix length")
+    ("prefix,p", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(3), "prefix length")
+    ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(3), "suffix length")
     ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("out.fa"), "output file")
     ("align,a", "write alignments to stderr")
     ;
@@ -243,6 +200,20 @@ int main(int argc, char** argv) {
   char tmp[] = {'A', 'C', 'G', 'T'};
   TAlphabet alphabet(tmp, tmp + sizeof(tmp) / sizeof(tmp[0]));
 
+  // Initialize thal arguments
+  boost::filesystem::path exepath = boost::filesystem::system_complete(argv[0]).parent_path();
+  std::string cfgpath = exepath.string() + "/primer3_config/";
+  primer3thal::thal_args a;
+  primer3thal::set_thal_default_args(&a);
+  a.temponly=1;
+  a.type = primer3thal::thal_end1;
+  a.mv = 50.0;
+  a.dv =  1.5;
+  a.dna_conc = 50.0;
+  a.dntp = 0.6;
+  a.temp = 50.0 + primer3thal::ABSOLUTE_ZERO;
+  primer3thal::get_thermodynamic_values(cfgpath.c_str());
+
   // Query FM-Index
   std::ofstream ofile(c.outfile.string().c_str());
   now = boost::posix_time::second_clock::local_time();
@@ -250,74 +221,107 @@ int main(int argc, char** argv) {
   for(TInputFasta::const_iterator itFa = infa.begin(); itFa != infa.end(); ++itFa) {
     std::string qr = itFa->second;
     if (qr.size() < c.kmer) continue;
+    int32_t koffset = qr.size() - c.kmer;
     qr = qr.substr(qr.size() - c.kmer);
     typedef std::set<std::string> TStringSet;
-    TStringSet strset;
-    neighbors(qr, alphabet, c.distance, c.indel, strset);
+    TStringSet fwdset;
+    neighbors(qr, alphabet, c.distance, c.indel, fwdset);
+    TStringSet revset;
     reverseComplement(qr);
-    neighbors(qr, alphabet, c.distance, c.indel, strset);
+    neighbors(qr, alphabet, c.distance, c.indel, revset);
     int32_t qhits = 0;
-    for(TStringSet::iterator its = strset.begin(); its != strset.end(); ++its, ++qhits) {
-      std::string query(*its);
-      std::size_t m = query.size();
-      std::size_t occs = sdsl::count(fm_index, query.begin(), query.end());
-      if (occs > 0) {
-	auto locations = locate(fm_index, query.begin(), query.begin() + m);
-	std::sort(locations.begin(), locations.end());
-	for(std::size_t i = 0, pre_extract = c.pre_context, post_extract = c.post_context; i < std::min(occs, c.max_locations); ++i) {
-	  int64_t bestPos = locations[i];
-	  int64_t cumsum = 0;
-	  uint32_t refIndex = 0;
-	  for(; bestPos >= cumsum + seqlen[refIndex]; ++refIndex) cumsum += seqlen[refIndex];
-	  uint32_t chrpos = bestPos - cumsum;
-	  if (pre_extract > locations[i]) {
-	    pre_extract = locations[i];
-	  }
-	  if (locations[i]+m+post_extract > fm_index.size()) {
-	    post_extract = fm_index.size() - locations[i] - m;
-	  }
-	  auto s = extract(fm_index, locations[i]-pre_extract, locations[i]+m+post_extract-1);
-	  std::string pre = s.substr(0, pre_extract);
-	  s = s.substr(pre_extract);
-	  if (pre.find_last_of('\n') != std::string::npos) {
-	    pre = pre.substr(pre.find_last_of('\n')+1);
-	  }
-	  std::string post = s.substr(m);
-	  post = post.substr(0, post.find_first_of('\n'));
-	  std::string fullseq = pre + s.substr(0, m) + post;
-	  ofile << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos << " hit:(" << qhits << "," << i << ") " << itFa->first << std::endl;
-	  ofile << fullseq << std::endl;
-	  if (c.align) {
-	    typedef boost::multi_array<char, 2> TAlign;
-	    TAlign alignFwd;
-	    TAlign alignRev;
-	    AlignConfig<true, false> semiglobal;
-	    DnaScore<int> sc(5, -4, -4, -4);
-	    std::string primer = itFa->second;
-	    int32_t fwdScore = needle(primer, fullseq, alignFwd, semiglobal, sc);
-	    reverseComplement(primer);
-	    int32_t revScore = needle(primer, fullseq, alignRev, semiglobal, sc);
-	    typedef typename TAlign::index TAIndex;
-	    std::cerr << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos << " hit:(" << qhits << "," << i << ") " << itFa->first << std::endl;
-	    if (fwdScore > revScore) {
-	      std::cerr << "AlignScore (Fwd): " << fwdScore << std::endl;
-	      for(TAIndex i = 0; i < (TAIndex) alignFwd.shape()[0]; ++i) {
-		for(TAIndex j = 0; j < (TAIndex) alignFwd.shape()[1]; ++j) {
-		  std::cerr << alignFwd[i][j];
-		}
-		std::cerr << std::endl;
-	      }
-	    } else {
-	      std::cerr << "AlignScore (Rev): " << revScore << std::endl;
-	      for(TAIndex i = 0; i < (TAIndex) alignRev.shape()[0]; ++i) {
-		for(TAIndex j = 0; j < (TAIndex) alignRev.shape()[1]; ++j) {
-		  std::cerr << alignRev[i][j];
-		}
-		std::cerr << std::endl;
-	      }
+    for(int32_t fwdrev = 0; fwdrev < 2; ++fwdrev) {
+      TStringSet::iterator its;
+      TStringSet::iterator itsEnd;
+      if (fwdrev == 0) {
+	its = fwdset.begin();
+	itsEnd = fwdset.end();
+      } else {
+	its = revset.begin();
+	itsEnd = revset.end();
+      }
+      for(; its != itsEnd; ++its, ++qhits) {
+	std::string query(*its);
+	std::size_t m = query.size();
+	std::size_t occs = sdsl::count(fm_index, query.begin(), query.end());
+	if (occs > 0) {
+	  auto locations = locate(fm_index, query.begin(), query.begin() + m);
+	  std::sort(locations.begin(), locations.end());
+	  std::size_t pre_extract = c.pre_context;
+	  std::size_t post_extract = c.post_context;
+	  if (fwdrev == 0) pre_extract += koffset;
+	  else post_extract += koffset;
+	  for(std::size_t i = 0; i < std::min(occs, c.max_locations); ++i) {
+	    int64_t bestPos = locations[i];
+	    int64_t cumsum = 0;
+	    uint32_t refIndex = 0;
+	    for(; bestPos >= cumsum + seqlen[refIndex]; ++refIndex) cumsum += seqlen[refIndex];
+	    uint32_t chrpos = bestPos - cumsum;
+	    if (pre_extract > locations[i]) {
+	      pre_extract = locations[i];
 	    }
-	    std::cerr << std::endl;
-	  }	    
+	    if (locations[i]+m+post_extract > fm_index.size()) {
+	      post_extract = fm_index.size() - locations[i] - m;
+	    }
+	    auto s = extract(fm_index, locations[i]-pre_extract, locations[i]+m+post_extract-1);
+	    std::string pre = s.substr(0, pre_extract);
+	    s = s.substr(pre_extract);
+	    if (pre.find_last_of('\n') != std::string::npos) {
+	      pre = pre.substr(pre.find_last_of('\n')+1);
+	    }
+	    std::string post = s.substr(m);
+	    post = post.substr(0, post.find_first_of('\n'));
+
+	    // thermodynamical alignemnt
+	    std::string genomicseq = pre + s.substr(0, m) + post;
+	    std::string primer = itFa->second;
+	    if (fwdrev == 0) reverseComplement(primer);
+	    primer3thal::oligo1 = (unsigned char*) primer.c_str();
+	    primer3thal::oligo2 = (unsigned char*) genomicseq.c_str();
+	    primer3thal::thal_results o;
+	    bool thalsuccess = primer3thal::thal(primer3thal::oligo1, primer3thal::oligo2, &a, &o);
+	    if ((!thalsuccess) || (o.temp == primer3thal::THAL_ERROR_SCORE)) {
+	      std::cerr << "Error during thermodynamical calculation!" << std::endl;
+	      return -1;
+	    }
+
+	    // Output fasta
+	    ofile << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos;
+	    if (fwdrev == 0) ofile << " fwd";
+	    else ofile << " rev";
+	    ofile << " temp:" << o.temp;
+	    ofile << " hit:(" << qhits << "," << i << ") " << itFa->first << std::endl;
+	    ofile << genomicseq << std::endl;
+
+	    // Debug alignment output
+	    if (c.align) {
+	      typedef boost::multi_array<char, 2> TAlign;
+	      TAlign align;
+	      AlignConfig<true, false> semiglobal;
+	      DnaScore<int> sc(5, -4, -4, -4);
+	      int32_t score = 0;
+	      primer = itFa->second;
+	      if (fwdrev == 0) score = needle(primer, genomicseq, align, semiglobal, sc);
+	      else {
+		reverseComplement(primer);
+		score = needle(primer, genomicseq, align, semiglobal, sc);
+	      }
+	      std::cerr << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos;
+	      if (fwdrev == 0) std::cerr << " fwd";
+	      else std::cerr << " rev";
+	      std::cerr << " temp:" << o.temp;
+	      std::cerr << " hit:(" << qhits << "," << i << ") " << itFa->first << std::endl;
+	      std::cerr << "AlignScore: " << score << std::endl;
+	      typedef typename TAlign::index TAIndex;
+	      for(TAIndex i = 0; i < (TAIndex) align.shape()[0]; ++i) {
+		for(TAIndex j = 0; j < (TAIndex) align.shape()[1]; ++j) {
+		  std::cerr << align[i][j];
+		}
+		std::cerr << std::endl;
+	      }
+	      std::cerr << std::endl;
+	    }	    
+	  }
 	}
       }
     }
@@ -325,6 +329,7 @@ int main(int argc, char** argv) {
   ofile.close();
 
   // Clean-up
+  primer3thal::destroy_thal_structures();
   if (fai != NULL) fai_destroy(fai);
   
   // Done
