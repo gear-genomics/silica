@@ -2183,7 +2183,7 @@ traceback(int i, int j, int* ps1, int* ps2, int maxLoop)
    free(SH);
 }
 
-inline bool
+inline void
 drawDimer(int* ps1, int* ps2, double temp, double H, double S, int temponly, double t37, thal_results *o)
 {
    int i, j, k, numSS1, numSS2, N;
@@ -2196,7 +2196,7 @@ drawDimer(int* ps1, int* ps2, double temp, double H, double S, int temponly, dou
       }
       o->temp = 0.0; /* lets use generalization here; this should rather be very negative value */
       std::cerr << "No predicted sec struc for given seq" << std::endl;
-      return false;
+      return;
    } else {
       N=0;
       for(i=0;i<len1;i++){
@@ -2218,7 +2218,7 @@ drawDimer(int* ps1, int* ps2, double temp, double H, double S, int temponly, dou
 		(double) S, (double) H, (double) G, (double) t);
       } else {
 	 o->temp = (double) t;
-	 return true;
+	 return;
       }
    }
 
@@ -2305,7 +2305,7 @@ drawDimer(int* ps1, int* ps2, double temp, double H, double S, int temponly, dou
    free(duplex[2]);
    free(duplex[3]);
 
-   return true;
+   return;
 }
 
 inline bool
@@ -2412,6 +2412,11 @@ destroy_thal_structures()
    structure for dimer or for monomer */
 inline bool
 thal(const unsigned char *oligo_f, const unsigned char *oligo_r, const thal_args *a, thal_results *o) {
+  if (NULL == o) {
+    std::cerr << "No result object!" << std::endl;
+    return false;
+  }
+
    double* SH;
    int i, j;
    int len_f, len_r;
@@ -2454,7 +2459,6 @@ thal(const unsigned char *oligo_f, const unsigned char *oligo_r, const thal_args
      std::cerr << "NULL 'in' pointer" << std::endl;
      return false;
    }
-   if (NULL == o) return false; /* Leave it to the caller to crash */
    if (a->type != thal_any && a->type != thal_end1 && a->type != thal_end2 && a->type != thal_hairpin) {
      std::cerr << "Illegal type" << std::endl;
      return false;
@@ -2635,7 +2639,7 @@ thal(const unsigned char *oligo_f, const unsigned char *oligo_r, const thal_args
 	ps2[j] = 0;
       if(isFinite(EnthalpyDPT(bestI, bestJ))){
 	 traceback(bestI, bestJ, ps1, ps2, a->maxLoop);
-	 if (!drawDimer(ps1, ps2, SHleft, dH, dS, a->temponly,a->temp, o)) return false;
+	 drawDimer(ps1, ps2, SHleft, dH, dS, a->temponly,a->temp, o);
 	 o->align_end_1=bestI;
 	 o->align_end_2=bestJ;
       } else  {
