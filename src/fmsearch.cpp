@@ -48,6 +48,7 @@ Contact: Tobias Rausch (rausch@embl.de)
 #include "neighbors.h"
 #include "align.h"
 #include "needle.h"
+#include "thal.h"
 
 using namespace sdsl;
 using namespace fmsearch;
@@ -65,11 +66,59 @@ struct Config {
   boost::filesystem::path genome;
 };
 
-
-
 int main(int argc, char** argv) {
   Config c;
+  boost::filesystem::path exepath = boost::filesystem::system_complete(argv[0]).parent_path();
+  std::string cfgpath = exepath.string() + "/primer3_config/";
   
+   int tmp_ret;
+   primer3thal::thal_args a;
+   primer3thal::thal_results o;
+   primer3thal::set_thal_default_args(&a);
+   a.temponly=1;
+   a.type = primer3thal::thal_end1;
+
+// PCR Parameters to hand over - all Double
+   a.mv = 50.0;
+   a.dv =  1.5;
+   a.dna_conc = 50.0;
+   a.dntp = 0.6;
+
+   // Temp to calc thermodynamic parameters
+   a.temp = 50.0 + primer3thal::ABSOLUTE_ZERO;
+
+   std::string p1("ggtcaatgcttcctgtgagc");
+   std::string p2("aaaagctcacaggaagcattgaccaaaa");
+
+   primer3thal::oligo1 = (unsigned char*) p1.c_str();
+   primer3thal::oligo2 = (unsigned char*) p2.c_str();
+
+   // read thermodynamic parameters 
+   tmp_ret = primer3thal::get_thermodynamic_values(cfgpath.c_str(), &o);
+
+   if (tmp_ret) {
+     fprintf(stderr, "%s\n", o.msg);
+     exit(-1);
+   }
+
+   // execute thermodynamical alignemnt 
+   primer3thal::thal(primer3thal::oligo1, primer3thal::oligo2, &a, &o);
+
+   // encountered error during thermodynamical calc 
+   if (o.temp == primer3thal::THAL_ERROR_SCORE) {
+      tmp_ret = fprintf(stderr, "Error: %s\n", o.msg);
+      exit(-1);
+   }
+   
+   printf("Temp: %f\n",o.temp);
+
+   primer3thal::destroy_thal_structures();
+
+
+
+
+
+
   // Parameter
   boost::program_options::options_description generic("Generic options");
   generic.add_options()
