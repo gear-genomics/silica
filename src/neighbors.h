@@ -66,6 +66,21 @@ reverseComplement(std::string& sequence) {
   }
 }
 
+// Special insert function that makes sure strset has no superstrings
+template<typename TStrSet>
+inline void
+_insert(TStrSet& strset, std::string const& s) {
+  bool insertS = true;
+  for (typename TStrSet::iterator it = strset.begin(); it != strset.end(); ) {
+    if (it->find(s) != std::string::npos) strset.erase(it++); // s is a substring of *it, erase *it
+    else {
+      if (s.find(*it) != std::string::npos) insertS = false; // *it is a substring of s, do not insert s
+      ++it;
+    }
+  }
+  if (insertS) strset.insert(s);
+}
+
 template<typename TAlphabet, typename TStringSet>
 inline void
 _neighbors(std::string const& query, TAlphabet const& alphabet, int32_t dist, bool indel, int32_t pos, TStringSet& strset) {
@@ -97,10 +112,12 @@ _neighbors(std::string const& query, TAlphabet const& alphabet, int32_t dist, bo
       std::string ins("N");
       ins[0] = *ait;
       std::string newst = query + ins;
-      strset.insert(newst);
+      //strset.insert(newst);
+      _insert(strset, newst);
     }
   }
-  strset.insert(query);
+  //strset.insert(query);
+  _insert(strset, query);
 }
       
 
