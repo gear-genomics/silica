@@ -24,6 +24,7 @@ Contact: Tobias Rausch (rausch@embl.de)
 
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 #define BOOST_DISABLE_ASSERTS
 #include <boost/multi_array.hpp>
@@ -56,15 +57,78 @@ using namespace fmsearch;
 struct Config {
   bool indel;
   bool align;
+  uint32_t cutTemp;
+  uint32_t maxProdSize;
   uint32_t kmer;
   uint32_t distance;
   std::size_t pre_context;
   std::size_t post_context;
   std::size_t max_locations;
   boost::filesystem::path outfile;
+  boost::filesystem::path primfile;
+  boost::filesystem::path resfile;
   boost::filesystem::path infile;
   boost::filesystem::path genome;
 };
+
+struct primerBind {
+  std::string chrom;
+  uint32_t pos;
+  bool onFor;
+  double temp;
+  std::string primer;
+  uint32_t leng;
+  std::string genSeq;
+};
+
+struct sortPrimer
+{
+    inline bool operator() (const primerBind& a, const primerBind& b)
+    {
+        return (a.temp > b.temp);
+    }
+};
+
+struct pcrProduct {
+  std::string chrom;
+  uint32_t leng;
+  std::string seq;
+  uint32_t forPos;
+  double forTemp;
+  std::string forPrimer;
+  uint32_t revPos;
+  double revTemp;
+  std::string revPrimer;
+};
+
+struct sortProducts
+{
+    inline bool operator() (const pcrProduct& a, const pcrProduct& b)
+    {
+        return (a.leng < b.leng);
+    }
+};
+
+
+
+void addUniqe(std::vector<primerBind>* coll, primerBind* prim) {
+  int found = 0;
+  for(std::vector<primerBind>::iterator it = coll->begin(); it != coll->end(); ++it) {
+    if ((prim->chrom.compare(it->chrom) == 0) &&
+        ((prim->pos - it->pos == 2) ||
+         (prim->pos - it->pos == 1) ||
+         (prim->pos - it->pos == 0) || // Better keep track during edit distance generation and compensate
+         (it->pos - prim->pos == 1) ||
+         (it->pos - prim->pos == 2)) && 
+        (prim->primer.compare(it->primer) == 0)){
+      found = 1;
+    }
+  }
+  if (found == 0) {
+    coll->push_back(*prim);
+  }
+}
+
 
 int main(int argc, char** argv) {
   Config c;
@@ -77,6 +141,8 @@ int main(int argc, char** argv) {
 
   boost::program_options::options_description appr("Approximate Search Options");
   appr.add_options()
+    ("cutTemp,x", boost::program_options::value<uint32_t>(&c.cutTemp)->default_value(35), "minimal primer meting temperature to consider")
+    ("maxProdSize,u", boost::program_options::value<uint32_t>(&c.maxProdSize)->default_value(15000), "maximal PCR Product size")
     ("kmer,k", boost::program_options::value<uint32_t>(&c.kmer)->default_value(15), "k-mer size")
     ("maxmatches,m", boost::program_options::value<std::size_t>(&c.max_locations)->default_value(10000), "max. number of matches per k-mer")
     ("distance,d", boost::program_options::value<uint32_t>(&c.distance)->default_value(1), "neighborhood distance")
@@ -88,6 +154,8 @@ int main(int argc, char** argv) {
     ("prefix,p", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(3), "prefix length")
     ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(3), "suffix length")
     ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("out.fa"), "output file")
+    ("result,r", boost::program_options::value<boost::filesystem::path>(&c.resfile)->default_value("res.txt"), "result file")
+    ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primer.fa"), "primer locations file")
     ("align,a", "write alignments to stderr")
     ;
     
@@ -218,6 +286,8 @@ int main(int argc, char** argv) {
   std::ofstream ofile(c.outfile.string().c_str());
   now = boost::posix_time::second_clock::local_time();
   std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Query FM-Index" << std::endl;
+  std::vector<primerBind> forBind;
+  std::vector<primerBind> revBind;  
   for(TInputFasta::const_iterator itFa = infa.begin(); itFa != infa.end(); ++itFa) {
     std::string qr = itFa->second;
     if (qr.size() < c.kmer) continue;
@@ -226,6 +296,8 @@ int main(int argc, char** argv) {
     typedef std::set<std::string> TStringSet;
     TStringSet fwdset;
     neighbors(qr, alphabet, c.distance, c.indel, fwdset);
+    // Debug
+    //for(TStringSet::iterator it = fwdset.begin(); it != fwdset.end(); ++it) std::cerr << *it << std::endl;
     TStringSet revset;
     reverseComplement(qr);
     neighbors(qr, alphabet, c.distance, c.indel, revset);
@@ -285,6 +357,26 @@ int main(int argc, char** argv) {
 	      return -1;
 	    }
 
+            // Score suitable primers
+            primerBind prim;
+            prim.chrom = std::string(faidx_iseq(fai, refIndex));
+            prim.pos = chrpos;
+            prim.temp = o.temp;
+            prim.primer = itFa->first;
+            prim.leng = 0;
+            prim.genSeq = genomicseq;
+            if (o.temp > c.cutTemp) {
+              if (fwdrev == 0) {
+                 prim.onFor = true;
+                //forBind.push_back(prim);
+                addUniqe(&forBind, &prim);
+              } else {
+                prim.onFor = false;
+                //revBind.push_back(prim);
+                addUniqe(&revBind, &prim);
+              }
+            }
+                           
 	    // Output fasta
 	    ofile << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos;
 	    if (fwdrev == 0) ofile << " fwd";
@@ -327,6 +419,57 @@ int main(int argc, char** argv) {
     }
   }
   ofile.close();
+
+  // Find PCR products
+  pcrProduct pcrProd;
+  std::vector<pcrProduct> pcrColl;
+  for(std::vector<primerBind>::iterator fw = forBind.begin(); fw != forBind.end(); ++fw) {
+    for(std::vector<primerBind>::iterator rv = revBind.begin(); rv != revBind.end(); ++rv) {
+      if ((fw->chrom.compare(rv->chrom) == 0) &&
+          (rv->pos - fw->pos < c.maxProdSize)){
+        pcrProd.leng = rv->pos - fw->pos;
+        pcrProd.chrom = fw->chrom;
+        pcrProd.forPos = fw->pos;
+        pcrProd.forTemp = fw->temp;
+        pcrProd.forPrimer = fw->primer;
+        pcrProd.revPos = rv->pos;
+        pcrProd.revTemp = rv->temp;
+        pcrProd.revPrimer = rv->primer;
+        pcrColl.push_back(pcrProd);
+      }
+    }
+  }
+
+  std::sort(pcrColl.begin(), pcrColl.end(), sortProducts());
+
+  std::ofstream rfile(c.resfile.string().c_str());
+  int count = 0;
+  for(std::vector<pcrProduct>::iterator it = pcrColl.begin(); it != pcrColl.end(); ++it) {
+    rfile << "PCR Product " << ++count << std::endl;
+    rfile << "  Size: " << it->leng << std::endl;
+    rfile << "  Chrom: " << it->chrom << std::endl;
+    rfile << "  Forward Primer: " << it->forPrimer << std::endl;
+    rfile << "    Melting Temperature: " << it->forTemp << " C" << std::endl;
+    rfile << "    Position: " << it->forPos << std::endl;
+    rfile << "  Reverse Primer: " << it->revPrimer << std::endl;
+    rfile << "    Melting Temperature: " << it->revTemp << " C" << std::endl;
+    rfile << "    Position: " << it->revPos << std::endl << std::endl;   
+  }
+  rfile.close();
+
+  //Print Primers
+  forBind.insert( forBind.end(), revBind.begin(), revBind.end() );
+  std::sort(forBind.begin(), forBind.end(), sortPrimer());
+  std::ofstream forfile(c.primfile.string().c_str());
+  for(std::vector<primerBind>::iterator it = forBind.begin(); it != forBind.end(); ++it) {
+    forfile << ">" << it->chrom << ":" << it->pos;
+    if (it->onFor) forfile << " fwd";
+    else forfile << " rev";
+    forfile << " temp:" << it->temp;
+    forfile << " primer:" << it->primer << std::endl;
+    forfile << it->genSeq << std::endl;
+  }
+  forfile.close();
 
   // Clean-up
   primer3thal::destroy_thal_structures();
