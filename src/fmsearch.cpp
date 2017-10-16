@@ -57,8 +57,13 @@ using namespace fmsearch;
 struct Config {
   bool indel;
   bool align;
-  uint32_t cutTemp;
+  double cutTemp;
   uint32_t maxProdSize;
+  double targetTemp;
+  double cutofPen;
+  double penDiff;
+  double penMis;
+  double penLen;
   uint32_t kmer;
   uint32_t distance;
   std::size_t pre_context;
@@ -78,6 +83,7 @@ struct primerBind {
   double temp;
   std::string primer;
   uint32_t leng;
+  std::string seq;
   std::string genSeq;
 };
 
@@ -92,20 +98,23 @@ struct sortPrimer
 struct pcrProduct {
   std::string chrom;
   uint32_t leng;
+  double penalty;
   std::string seq;
   uint32_t forPos;
   double forTemp;
   std::string forPrimer;
-  uint32_t revPos;
+  std::string forSeq;
+   uint32_t revPos;
   double revTemp;
   std::string revPrimer;
+  std::string revSeq;
 };
 
 struct sortProducts
 {
     inline bool operator() (const pcrProduct& a, const pcrProduct& b)
     {
-        return (a.leng < b.leng);
+        return (a.penalty < b.penalty);
     }
 };
 
@@ -132,6 +141,16 @@ void addUniqe(std::vector<primerBind>* coll, primerBind* prim) {
 
 int main(int argc, char** argv) {
   Config c;
+
+  // Initialize thal arguments
+  boost::filesystem::path exepath = boost::filesystem::system_complete(argv[0]).parent_path();
+  std::string cfgpath = exepath.string() + "/primer3_config/";
+  primer3thal::thal_args a;
+  primer3thal::set_thal_default_args(&a);
+  a.temponly=1;
+  a.type = primer3thal::thal_end1;
+  primer3thal::get_thermodynamic_values(cfgpath.c_str());
+
   // CMD Parameter
   boost::program_options::options_description generic("Generic options");
   generic.add_options()
@@ -141,12 +160,30 @@ int main(int argc, char** argv) {
 
   boost::program_options::options_description appr("Approximate Search Options");
   appr.add_options()
-    ("cutTemp,x", boost::program_options::value<uint32_t>(&c.cutTemp)->default_value(35), "minimal primer meting temperature to consider")
-    ("maxProdSize,u", boost::program_options::value<uint32_t>(&c.maxProdSize)->default_value(15000), "maximal PCR Product size")
     ("kmer,k", boost::program_options::value<uint32_t>(&c.kmer)->default_value(15), "k-mer size")
     ("maxmatches,m", boost::program_options::value<std::size_t>(&c.max_locations)->default_value(10000), "max. number of matches per k-mer")
     ("distance,d", boost::program_options::value<uint32_t>(&c.distance)->default_value(1), "neighborhood distance")
     ("hamming,n", "use hamming neighborhood instead of edit distance")
+    ;
+
+  boost::program_options::options_description score("Parameters for Scoring and Penalty Calculation");
+  score.add_options()
+    ("cutTemp,c", boost::program_options::value<double>(&c.cutTemp)->default_value(40.0), "minimal primer meting temperature to consider")
+    ("maxProdSize,l", boost::program_options::value<uint32_t>(&c.maxProdSize)->default_value(15000), "maximal PCR Product size amplified")
+    ("targetTm", boost::program_options::value<double>(&c.targetTemp)->default_value(58.0), "intended target Tm for primers")
+    ("CutoffPenalty", boost::program_options::value<double>(&c.cutofPen)->default_value(-1.0), "maximal penalty for products to consider, -1 = keep all")
+    ("penaltyTmDiff", boost::program_options::value<double>(&c.penDiff)->default_value(0.2), "multiplication factor for deviation of primer Tm penalty")
+    ("penaltyTmMismatch", boost::program_options::value<double>(&c.penMis)->default_value(0.4), "multiplication factor for Tm pair difference penalty")
+    ("penaltyLength", boost::program_options::value<double>(&c.penLen)->default_value(0.001), "multiplication factor for amplicon length penalty")
+    ;
+
+  boost::program_options::options_description tmcalc("Parameters for Tm Calculation");
+  tmcalc.add_options()
+    ("enttemp", boost::program_options::value<double>(&a.temp)->default_value(37.0), "temperature for entropie and entalpie calculation in Celsius")
+    ("monovalent", boost::program_options::value<double>(&a.mv)->default_value(50.0), "concentration of monovalent ions in mMol")
+    ("divalent", boost::program_options::value<double>(&a.dv)->default_value(1.5), "concentration of divalent ions in mMol")
+    ("dna", boost::program_options::value<double>(&a.dna_conc)->default_value(50.0), "concentration of annealing(!) Oligos in nMol")
+    ("dntp", boost::program_options::value<double>(&a.dntp)->default_value(0.6), "the sum  of all dNTPs in mMol")
     ;
 
   boost::program_options::options_description outp("Output Options");
@@ -154,9 +191,9 @@ int main(int argc, char** argv) {
     ("prefix,p", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(3), "prefix length")
     ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(3), "suffix length")
     ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("out.fa"), "output file")
-    ("result,r", boost::program_options::value<boost::filesystem::path>(&c.resfile)->default_value("res.txt"), "result file")
-    ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primer.fa"), "primer locations file")
-    ("align,a", "write alignments to stderr")
+    ("amplicon,a", boost::program_options::value<boost::filesystem::path>(&c.resfile)->default_value("amplicons.txt"), "amplicon file")
+    ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primers.fa"), "primer locations file")
+    ("align,x", "write alignments to stderr")
     ;
     
   boost::program_options::options_description hidden("Hidden options");
@@ -168,9 +205,9 @@ int main(int argc, char** argv) {
   pos_args.add("input-file", -1);
 
   boost::program_options::options_description cmdline_options;
-  cmdline_options.add(generic).add(appr).add(outp).add(hidden);
+  cmdline_options.add(generic).add(appr).add(score).add(tmcalc).add(outp).add(hidden);
   boost::program_options::options_description visible_options;
-  visible_options.add(generic).add(appr).add(outp);
+  visible_options.add(generic).add(appr).add(score).add(tmcalc).add(outp);
   boost::program_options::variables_map vm;
   boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(cmdline_options).positional(pos_args).run(), vm);
   boost::program_options::notify(vm);
@@ -187,6 +224,9 @@ int main(int argc, char** argv) {
   else c.align = true;
   if (!vm.count("hamming")) c.indel = true;
   else c.indel = false;
+
+  // Fix provided Temperature
+  a.temp += primer3thal::ABSOLUTE_ZERO;
 
   // Show cmd
   boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
@@ -267,20 +307,6 @@ int main(int argc, char** argv) {
   typedef std::set<char> TAlphabet;
   char tmp[] = {'A', 'C', 'G', 'T'};
   TAlphabet alphabet(tmp, tmp + sizeof(tmp) / sizeof(tmp[0]));
-
-  // Initialize thal arguments
-  boost::filesystem::path exepath = boost::filesystem::system_complete(argv[0]).parent_path();
-  std::string cfgpath = exepath.string() + "/primer3_config/";
-  primer3thal::thal_args a;
-  primer3thal::set_thal_default_args(&a);
-  a.temponly=1;
-  a.type = primer3thal::thal_end1;
-  a.mv = 50.0;
-  a.dv =  1.5;
-  a.dna_conc = 50.0;
-  a.dntp = 0.6;
-  a.temp = 50.0 + primer3thal::ABSOLUTE_ZERO;
-  primer3thal::get_thermodynamic_values(cfgpath.c_str());
 
   // Query FM-Index
   std::ofstream ofile(c.outfile.string().c_str());
@@ -364,6 +390,7 @@ int main(int argc, char** argv) {
             prim.temp = o.temp;
             prim.primer = itFa->first;
             prim.leng = 0;
+            prim.seq = itFa->second;
             prim.genSeq = genomicseq;
             if (o.temp > c.cutTemp) {
               if (fwdrev == 0) {
@@ -432,10 +459,22 @@ int main(int argc, char** argv) {
         pcrProd.forPos = fw->pos;
         pcrProd.forTemp = fw->temp;
         pcrProd.forPrimer = fw->primer;
+        pcrProd.forSeq = fw->seq;
         pcrProd.revPos = rv->pos;
         pcrProd.revTemp = rv->temp;
         pcrProd.revPrimer = rv->primer;
-        pcrColl.push_back(pcrProd);
+        pcrProd.revSeq = rv->seq;
+        pcrProd.seq = "stest";
+        // Calculate Penalty
+        double pen = std::abs(c.targetTemp - fw->temp) * c.penDiff;
+        pen += std::abs(c.targetTemp - rv->temp) * c.penDiff;
+        pen += std::abs(fw->temp - rv->temp) * c.penMis;
+        pen += pcrProd.leng * c.penLen;
+
+        pcrProd.penalty = pen;
+        if ((c.cutofPen < 0) || (pen < c.cutofPen)) {
+          pcrColl.push_back(pcrProd);
+        }
       }
     }
   }
@@ -445,15 +484,18 @@ int main(int argc, char** argv) {
   std::ofstream rfile(c.resfile.string().c_str());
   int count = 0;
   for(std::vector<pcrProduct>::iterator it = pcrColl.begin(); it != pcrColl.end(); ++it) {
-    rfile << "PCR Product " << ++count << std::endl;
-    rfile << "  Size: " << it->leng << std::endl;
-    rfile << "  Chrom: " << it->chrom << std::endl;
-    rfile << "  Forward Primer: " << it->forPrimer << std::endl;
-    rfile << "    Melting Temperature: " << it->forTemp << " C" << std::endl;
-    rfile << "    Position: " << it->forPos << std::endl;
-    rfile << "  Reverse Primer: " << it->revPrimer << std::endl;
-    rfile << "    Melting Temperature: " << it->revTemp << " C" << std::endl;
-    rfile << "    Position: " << it->revPos << std::endl << std::endl;   
+    rfile << "Amplicon_" << count << "_Length=" << it->leng << std::endl;
+    rfile << "Amplicon_" << count << "_Penalty=" << it->penalty << std::endl;
+    rfile << "Amplicon_" << count << "_For_Pos=" << it->chrom << ":" << it->forPos << std::endl;
+    rfile << "Amplicon_" << count << "_For_Tm=" << it->forTemp << std::endl;
+    rfile << "Amplicon_" << count << "_For_Name=" << it->forPrimer << std::endl;
+    rfile << "Amplicon_" << count << "_For_Seq=" << it->forSeq << std::endl;
+    rfile << "Amplicon_" << count << "_Rev_Pos=" << it->chrom << ":" << it->revPos << std::endl;
+    rfile << "Amplicon_" << count << "_Rev_Tm=" << it->revTemp << std::endl;
+    rfile << "Amplicon_" << count << "_Rev_Name=" << it->revPrimer << std::endl;
+    rfile << "Amplicon_" << count << "_Rev_Seq=" << it->revSeq << std::endl;
+    rfile << "Amplicon_" << count << "_Seq=" << it->seq<< std::endl;
+    count++;
   }
   rfile.close();
 
@@ -461,13 +503,17 @@ int main(int argc, char** argv) {
   forBind.insert( forBind.end(), revBind.begin(), revBind.end() );
   std::sort(forBind.begin(), forBind.end(), sortPrimer());
   std::ofstream forfile(c.primfile.string().c_str());
+  count = 0;
   for(std::vector<primerBind>::iterator it = forBind.begin(); it != forBind.end(); ++it) {
-    forfile << ">" << it->chrom << ":" << it->pos;
-    if (it->onFor) forfile << " fwd";
-    else forfile << " rev";
-    forfile << " temp:" << it->temp;
-    forfile << " primer:" << it->primer << std::endl;
-    forfile << it->genSeq << std::endl;
+    forfile << "Primer_" << count << "_Tm="  << it->temp << std::endl;
+    forfile << "Primer_" << count << "_Pos="  <<  it->chrom << ":" << it->pos << std::endl;
+    forfile << "Primer_" << count << "_Ori=";
+    if (it->onFor) forfile << "forward" << std::endl;
+    else forfile << "reverse" << std::endl;
+    forfile << "Primer_" << count << "_Name"  << it->primer << std::endl;
+    forfile << "Primer_" << count << "_Seq="  << it->seq << std::endl;
+    forfile << "Primer_" << count << "_Genome="  << it->genSeq << std::endl;
+    count++;
   }
   forfile.close();
 
