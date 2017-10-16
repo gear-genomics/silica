@@ -118,17 +118,11 @@ struct sortProducts
     }
 };
 
-
-
 void addUniqe(std::vector<primerBind>* coll, primerBind* prim) {
   int found = 0;
   for(std::vector<primerBind>::iterator it = coll->begin(); it != coll->end(); ++it) {
     if ((prim->chrom.compare(it->chrom) == 0) &&
-        ((prim->pos - it->pos == 2) ||
-         (prim->pos - it->pos == 1) ||
-         (prim->pos - it->pos == 0) || // Better keep track during edit distance generation and compensate
-         (it->pos - prim->pos == 1) ||
-         (it->pos - prim->pos == 2)) && 
+        (prim->pos - it->pos == 0) && 
         (prim->primer.compare(it->primer) == 0)){
       found = 1;
     }
@@ -319,7 +313,7 @@ int main(int argc, char** argv) {
     if (qr.size() < c.kmer) continue;
     int32_t koffset = qr.size() - c.kmer;
     qr = qr.substr(qr.size() - c.kmer);
-    typedef std::set<std::string> TStringSet;
+    typedef std::set<primLoci> TStringSet;
     TStringSet fwdset;
     neighbors(qr, alphabet, c.distance, c.indel, fwdset);
     // Debug
@@ -339,7 +333,7 @@ int main(int argc, char** argv) {
 	itsEnd = revset.end();
       }
       for(; its != itsEnd; ++its, ++qhits) {
-	std::string query(*its);
+	std::string query(its->seq);
 	std::size_t m = query.size();
 	std::size_t occs = sdsl::count(fm_index, query.begin(), query.end());
 	if (occs > 0) {
@@ -386,7 +380,6 @@ int main(int argc, char** argv) {
             // Score suitable primers
             primerBind prim;
             prim.chrom = std::string(faidx_iseq(fai, refIndex));
-            prim.pos = chrpos;
             prim.temp = o.temp;
             prim.primer = itFa->first;
             prim.leng = 0;
@@ -394,11 +387,13 @@ int main(int argc, char** argv) {
             prim.genSeq = genomicseq;
             if (o.temp > c.cutTemp) {
               if (fwdrev == 0) {
-                 prim.onFor = true;
+                prim.onFor = true;
+                prim.pos = chrpos - its->fivePrim;
                 //forBind.push_back(prim);
                 addUniqe(&forBind, &prim);
               } else {
                 prim.onFor = false;
+                prim.pos = chrpos + its->threePrim;
                 //revBind.push_back(prim);
                 addUniqe(&revBind, &prim);
               }

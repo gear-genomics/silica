@@ -50,6 +50,15 @@ using namespace sdsl;
 
 namespace fmsearch {
 
+class primLoci {
+  public:
+  std::string seq;
+  int fivePrim;
+  int threePrim;
+  bool operator <(const primLoci &b) const {return this->seq < b.seq;};
+  int area() {return 1;}
+};
+
 inline void
 reverseComplement(std::string& sequence) {
   std::string rev = boost::to_upper_copy(std::string(sequence.rbegin(), sequence.rend()));
@@ -69,12 +78,12 @@ reverseComplement(std::string& sequence) {
 // Special insert function that makes sure strset has no superstrings
 template<typename TStrSet>
 inline void
-_insert(TStrSet& strset, std::string const& s) {
+_insert(TStrSet& strset, primLoci const& s) {
   bool insertS = true;
   for (typename TStrSet::iterator it = strset.begin(); it != strset.end(); ) {
-    if (it->find(s) != std::string::npos) strset.erase(it++); // s is a substring of *it, erase *it
+    if (it->seq.find(s.seq) != std::string::npos) strset.erase(it++); // s is a substring of *it, erase *it
     else {
-      if (s.find(*it) != std::string::npos) insertS = false; // *it is a substring of s, do not insert s
+      if (s.seq.find(it->seq) != std::string::npos) insertS = false; // *it is a substring of s, do not insert s
       ++it;
     }
   }
@@ -83,26 +92,51 @@ _insert(TStrSet& strset, std::string const& s) {
 
 template<typename TAlphabet, typename TStringSet>
 inline void
-_neighbors(std::string const& query, TAlphabet const& alphabet, int32_t dist, bool indel, int32_t pos, TStringSet& strset) {
-  for(int32_t i = pos; i < (int32_t) query.size();++i) {
+_neighbors(primLoci const& query, TAlphabet const& alphabet, int32_t dist, bool indel, int32_t pos, TStringSet& strset, int lb) {
+  for(int32_t i = pos; i < (int32_t) query.seq.size();++i) {
     if (dist > 0) {
       if (indel) {
 	// Insertion
 	for(typename TAlphabet::const_iterator ait = alphabet.begin(); ait != alphabet.end(); ++ait) {
 	  std::string ins("N");
 	  ins[0] = *ait;
-	  std::string newst = query.substr(0, i) + ins + query.substr(i);
-	  _neighbors(newst, alphabet, dist - 1, indel, pos, strset);
+          primLoci newst;
+	  newst.seq = query.seq.substr(0, i) + ins + query.seq.substr(i);
+          if ((lb == 1) && (i == 0)) {
+            newst.fivePrim = -1;
+          } else {
+            newst.fivePrim = 0;
+          }
+          if ((lb == 1) && (i == query.seq.size() - 1)) {
+            newst.threePrim = -1;
+          } else {
+            newst.threePrim = 0;
+          }
+	  _neighbors(newst, alphabet, dist - 1, indel, pos, strset, 0);
 	}
 	// Deletion
-	std::string newst = query.substr(0, i) + query.substr(i + 1);
-	_neighbors(newst, alphabet, dist - 1, indel, pos + 1, strset);
+	primLoci newst;
+        newst.seq = query.seq.substr(0, i) + query.seq.substr(i + 1);
+        if ((lb == 1) && (i == 0)) {
+          newst.fivePrim = 1;
+        } else {
+          newst.fivePrim = 0;
+        }
+        if ((lb == 1) && (i == query.seq.size() - 1)) {
+          newst.threePrim = 1;
+        } else {
+          newst.threePrim = 0;
+        }
+        _neighbors(newst, alphabet, dist - 1, indel, pos + 1, strset, 0);
       }
       for(typename TAlphabet::const_iterator ait = alphabet.begin(); ait != alphabet.end(); ++ait) {
-	if (*ait != query[i]) {
-	  std::string newst(query);
-	  newst[i] = *ait;
-	  _neighbors(newst, alphabet, dist - 1, indel, pos+1, strset);
+	if (*ait != query.seq[i]) {
+	  primLoci newst;
+          newst.seq = query.seq;
+	  newst.seq[i] = *ait;
+          newst.fivePrim = 0;
+          newst.threePrim = 0;
+	  _neighbors(newst, alphabet, dist - 1, indel, pos+1, strset, 0);
 	}
       }
     }
@@ -111,7 +145,8 @@ _neighbors(std::string const& query, TAlphabet const& alphabet, int32_t dist, bo
     for(typename TAlphabet::const_iterator ait = alphabet.begin(); ait != alphabet.end(); ++ait) {
       std::string ins("N");
       ins[0] = *ait;
-      std::string newst = query + ins;
+      primLoci newst;
+      newst.seq = query.seq + ins;
       //strset.insert(newst);
       _insert(strset, newst);
     }
@@ -124,7 +159,9 @@ _neighbors(std::string const& query, TAlphabet const& alphabet, int32_t dist, bo
 template<typename TAlphabet, typename TStringSet>
 inline void
 neighbors(std::string const& query, TAlphabet const& alphabet, int32_t dist, bool indel, TStringSet& strset) {
-  _neighbors(query, alphabet, dist, indel, 0, strset);
+  primLoci loc;
+  loc.seq = query;
+  _neighbors(loc, alphabet, dist, indel, 0, strset, 1);
 }
 
 
