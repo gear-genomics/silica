@@ -115,9 +115,18 @@ struct SortProducts : public std::binary_function<TRecord, TRecord, bool>
 
 template<typename TPrimerBinds>
 inline void
-addUnique(TPrimerBinds& coll, PrimerBind& prim) {  
-  for(typename TPrimerBinds::iterator it = coll.begin(); it != coll.end(); ++it)
-    if ((prim.refIndex == it->refIndex) && (prim.pos == it->pos) && (prim.primerId == it->primerId)) return;
+addUnique(TPrimerBinds& coll, PrimerBind& prim, uint32_t const distance, bool const indel) {
+  uint32_t idx = 0;
+  for(typename TPrimerBinds::iterator it = coll.begin(); it != coll.end(); ++it, ++idx) {
+    if ((prim.refIndex == it->refIndex) && (prim.primerId == it->primerId)) {
+      if ( ((!indel) && (prim.pos == it->pos)) || ((indel)  && (prim.pos + 2*distance >= it->pos) && (prim.pos <= it->pos + 2*distance)) ) {
+	// Duplicate, find best temp
+	if (prim.temp > it->temp) coll[idx] = prim;
+	return;
+      }
+    }
+  }
+  // No other primer found
   coll.push_back(prim);
 }
 
@@ -305,7 +314,7 @@ int main(int argc, char** argv) {
     if (qr.size() < c.kmer) continue;
     int32_t koffset = qr.size() - c.kmer;
     qr = qr.substr(qr.size() - c.kmer);
-    typedef std::set<PrimLoci> TStringSet;
+    typedef std::set<std::string> TStringSet;
     TStringSet fwdset;
     neighbors(qr, alphabet, c.distance, c.indel, fwdset);
     // Debug
@@ -325,7 +334,7 @@ int main(int argc, char** argv) {
 	itsEnd = revset.end();
       }
       for(; its != itsEnd; ++its, ++qhits) {
-	std::string query(its->seq);
+	std::string query(*its);
 	std::size_t m = query.size();
 	std::size_t occs = sdsl::count(fm_index, query.begin(), query.end());
 	if (occs > 0) {
@@ -378,12 +387,12 @@ int main(int argc, char** argv) {
             if (o.temp > c.cutTemp) {
               if (fwdrev == 0) {
                 prim.onFor = true;
-                prim.pos = chrpos - its->fivePrim;
-                addUnique(forBind, prim);
+                prim.pos = chrpos;
+                addUnique(forBind, prim, c.distance, c.indel);
               } else {
                 prim.onFor = false;
-                prim.pos = chrpos + its->threePrim;
-                addUnique(revBind, prim);
+                prim.pos = chrpos;
+                addUnique(revBind, prim, c.distance, c.indel);
               }
             }
                            
