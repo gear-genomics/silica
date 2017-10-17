@@ -305,7 +305,7 @@ int main(int argc, char** argv) {
     if (qr.size() < c.kmer) continue;
     int32_t koffset = qr.size() - c.kmer;
     qr = qr.substr(qr.size() - c.kmer);
-    typedef std::set<primLoci> TStringSet;
+    typedef std::set<PrimLoci> TStringSet;
     TStringSet fwdset;
     neighbors(qr, alphabet, c.distance, c.indel, fwdset);
     // Debug
