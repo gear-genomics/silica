@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
 
   boost::program_options::options_description outp("Output Options");
   outp.add_options()
-    ("prefix,p", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(3), "prefix length")
+    ("prefix,r", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(3), "prefix length")
     ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(3), "suffix length")
     ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("amplicons.txt"), "output file")
     ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primers.fa"), "primer locations file")
