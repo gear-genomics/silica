@@ -1,6 +1,6 @@
 /*
 ============================================================================
-FMsearch: FM-Index Search
+Silica: In-silico PCR
 ============================================================================
 Copyright (C) 2017 Tobias Rausch
 
@@ -48,7 +48,7 @@ Contact: Tobias Rausch (rausch@embl.de)
 
 using namespace sdsl;
 
-namespace fmsearch {
+namespace silica {
 
 class primLoci {
   public:

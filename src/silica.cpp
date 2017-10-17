@@ -1,6 +1,6 @@
 /*
 ============================================================================
-FMsearch: FM-Index Search
+Silica: In-silico PCR
 ============================================================================
 Copyright (C) 2017 Tobias Rausch
 
@@ -52,7 +52,7 @@ Contact: Tobias Rausch (rausch@embl.de)
 #include "thal.h"
 
 using namespace sdsl;
-using namespace fmsearch;
+using namespace silica;
 
 struct Config {
   bool indel;

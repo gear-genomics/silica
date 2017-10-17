@@ -1,6 +1,6 @@
 /*
 ============================================================================
-FMsearch: FM-Index Search
+Silica: In-silico PCR
 ============================================================================
 Copyright (C) 2017 Tobias Rausch
 
@@ -29,7 +29,7 @@ Contact: Tobias Rausch (rausch@embl.de)
 #include <iostream>
 #include "align.h"
 
-namespace fmsearch
+namespace silica
 {
 
   template<typename TAlign1, typename TAlign2, typename TAlign, typename TAlignConfig, typename TScoreObject>

@@ -1,6 +1,6 @@
 /*
 ============================================================================
-FMsearch: FM-Index Search
+Silica: In-silico PCR
 ============================================================================
 Copyright (C) 2017 Tobias Rausch
 
@@ -26,7 +26,7 @@ Contact: Tobias Rausch (rausch@embl.de)
 
 #include <iostream>
 
-namespace fmsearch
+namespace silica
 {
 
   template<typename TScoreValue>

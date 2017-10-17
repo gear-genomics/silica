@@ -35,7 +35,7 @@ BOOSTSOURCES = $(wildcard src/modular-boost/libs/iostreams/include/boost/iostrea
 PBASE=$(shell pwd)
 
 # Targets
-TARGETS = .sdsl .htslib .boost src/fmsearch
+TARGETS = .sdsl .htslib .boost src/silica
 
 all:   	$(TARGETS)
 
@@ -48,7 +48,7 @@ all:   	$(TARGETS)
 .boost: $(BOOSTSOURCES)
 	cd src/modular-boost && ./bootstrap.sh --prefix=${PWD}/src/modular-boost --without-icu --with-libraries=iostreams,filesystem,system,program_options,date_time && ./b2 && ./b2 headers && cd ../../ && touch .boost
 
-src/fmsearch: .sdsl .htslib .boost ${IDXSOURCES}
+src/silica: .sdsl .htslib .boost ${IDXSOURCES}
 	$(CXX) $(CXXFLAGS) $@.cpp -o $@ $(LDFLAGS)
 
 clean:

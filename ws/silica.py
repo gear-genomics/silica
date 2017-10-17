@@ -74,7 +74,7 @@ def upload_file():
       errfile = os.path.join(sf, "silica_" + uuidstr + ".err")
       with open(logfile, "w") as log:
          with open(errfile, "w") as err:
-            slexe = os.path.join(app.config['SILICA'], "./src/fmsearch")
+            slexe = os.path.join(app.config['SILICA'], "./src/silica")
             return_code = call([slexe, '-g', genome, '-o', outfile, '-p', prfile, ffaname], stdout=log, stderr=err)
       if return_code != 0:
          error = "Error in running Silica!"

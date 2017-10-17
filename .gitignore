@@ -1,7 +1,7 @@
 .sdsl
 .htslib
 .boost
-src/fmsearch
+src/silica
 src/sdslLite/
 fm/
 data/

@@ -1,15 +1,15 @@
-Sequence search in an FM-Index.
+In-silico PCR on complete genomes.
 
 Installing
 ----------
 
-`git clone --recursive https://github.com/gear-genomics/fmsearch.git`
+`git clone --recursive https://github.com/gear-genomics/silica.git`
 
-`cd fmsearch`
+`cd silica`
 
 `make all`
 
 Running
 -------
 
-`./src/fmsearch -g hg19.fa.gz sequences.fasta`
+`./src/silica -g hg19.fa.gz sequences.fasta`
