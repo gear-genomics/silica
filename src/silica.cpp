@@ -118,7 +118,7 @@ inline void
 addUnique(TPrimerBinds& coll, PrimerBind& prim, uint32_t const distance, bool const indel) {
   uint32_t idx = 0;
   for(typename TPrimerBinds::iterator it = coll.begin(); it != coll.end(); ++it, ++idx) {
-    if ((prim.refIndex == it->refIndex) && (prim.primerId == it->primerId)) {
+    if (prim.primerId == it->primerId) {
       if ( ((!indel) && (prim.pos == it->pos)) || ((indel)  && (prim.pos + 2*distance >= it->pos) && (prim.pos <= it->pos + 2*distance)) ) {
 	// Duplicate, find best temp
 	if (prim.temp > it->temp) coll[idx] = prim;
@@ -307,8 +307,9 @@ int main(int argc, char** argv) {
   now = boost::posix_time::second_clock::local_time();
   std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Query FM-Index" << std::endl;
   typedef std::vector<PrimerBind> TPrimerBinds;
-  TPrimerBinds forBind;
-  TPrimerBinds revBind;  
+  typedef std::vector<TPrimerBinds> TChrPrimerBinds;
+  TChrPrimerBinds forBind(faidx_nseq(fai), TPrimerBinds());
+  TChrPrimerBinds revBind(faidx_nseq(fai), TPrimerBinds());
   for(uint32_t primerId = 0; primerId < pSeq.size(); ++primerId) {
     std::string qr = pSeq[primerId];
     if (qr.size() < c.kmer) continue;
@@ -380,7 +381,7 @@ int main(int argc, char** argv) {
 
             // Score suitable primers
             PrimerBind prim;
-            prim.refIndex = refIndex;
+	    prim.refIndex = refIndex;
             prim.temp = o.temp;
             prim.primerId = primerId;
             prim.genSeq = genomicseq;
@@ -388,11 +389,11 @@ int main(int argc, char** argv) {
               if (fwdrev == 0) {
                 prim.onFor = true;
                 prim.pos = chrpos;
-                addUnique(forBind, prim, c.distance, c.indel);
+                addUnique(forBind[refIndex], prim, c.distance, c.indel);
               } else {
                 prim.onFor = false;
                 prim.pos = chrpos;
-                addUnique(revBind, prim, c.distance, c.indel);
+                addUnique(revBind[refIndex], prim, c.distance, c.indel);
               }
             }
                            
@@ -429,39 +430,44 @@ int main(int argc, char** argv) {
       }
     }
   }
-
   // Find PCR products
+  now = boost::posix_time::second_clock::local_time();
+  std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Find PCR Products" << std::endl;
   typedef std::vector<PcrProduct> TPcrProducts;
   TPcrProducts pcrColl;
-  for(TPrimerBinds::iterator fw = forBind.begin(); fw != forBind.end(); ++fw) {
-    for(TPrimerBinds::iterator rv = revBind.begin(); rv != revBind.end(); ++rv) {
-      if ((fw->refIndex == rv->refIndex) && (rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
-	PcrProduct pcrProd;
-        pcrProd.leng = rv->pos - fw->pos;
-        pcrProd.refIndex = fw->refIndex;
-        pcrProd.forPos = fw->pos;
-        pcrProd.forTemp = fw->temp;
-        pcrProd.forId = fw->primerId;
-        pcrProd.revPos = rv->pos;
-        pcrProd.revTemp = rv->temp;
-        pcrProd.revId = rv->primerId;
-        pcrProd.seq = "stest";
-        // Calculate Penalty
-        double pen = std::abs(c.targetTemp - fw->temp) * c.penDiff;
-        pen += std::abs(c.targetTemp - rv->temp) * c.penDiff;
-        pen += std::abs(fw->temp - rv->temp) * c.penMis;
-        pen += pcrProd.leng * c.penLen;
+  for(uint32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
+    for(TPrimerBinds::iterator fw = forBind[refIndex].begin(); fw != forBind[refIndex].end(); ++fw) {
+      for(TPrimerBinds::iterator rv = revBind[refIndex].begin(); rv != revBind[refIndex].end(); ++rv) {
+	if ((rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
+	  PcrProduct pcrProd;
+	  pcrProd.leng = rv->pos - fw->pos;
+	  pcrProd.refIndex = refIndex;
+	  pcrProd.forPos = fw->pos;
+	  pcrProd.forTemp = fw->temp;
+	  pcrProd.forId = fw->primerId;
+	  pcrProd.revPos = rv->pos;
+	  pcrProd.revTemp = rv->temp;
+	  pcrProd.revId = rv->primerId;
+	  pcrProd.seq = "stest";
+	  // Calculate Penalty
+	  double pen = std::abs(c.targetTemp - fw->temp) * c.penDiff;
+	  pen += std::abs(c.targetTemp - rv->temp) * c.penDiff;
+	  pen += std::abs(fw->temp - rv->temp) * c.penMis;
+	  pen += pcrProd.leng * c.penLen;
 
-        pcrProd.penalty = pen;
-        if ((c.cutofPen < 0) || (pen < c.cutofPen)) pcrColl.push_back(pcrProd);
+	  pcrProd.penalty = pen;
+	  if ((c.cutofPen < 0) || (pen < c.cutofPen)) pcrColl.push_back(pcrProd);
+	}
       }
     }
   }
 
   // Sort by penalty
   std::sort(pcrColl.begin(), pcrColl.end(), SortProducts<PcrProduct>());
-
+  
   // Output amplicons
+  now = boost::posix_time::second_clock::local_time();
+  std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Output Amplicons" << std::endl;
   std::ofstream rfile(c.outfile.string().c_str());
   int32_t count = 0;
   for(TPcrProducts::iterator it = pcrColl.begin(); it != pcrColl.end(); ++it, ++count) {
@@ -479,16 +485,22 @@ int main(int argc, char** argv) {
   }
   rfile.close();
 
-  // Sort Primers on temperature
-  forBind.insert( forBind.end(), revBind.begin(), revBind.end() );
-  std::sort(forBind.begin(), forBind.end(), SortPrimer<PrimerBind>());
+  // Collect all primers
+  TPrimerBinds allp;  
+  for(uint32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
+    allp.insert( allp.end(), forBind[refIndex].begin(), forBind[refIndex].end() );
+    allp.insert( allp.end(), revBind[refIndex].begin(), revBind[refIndex].end() );
+  }
 
+  // Sort by temperature
+  std::sort(allp.begin(), allp.end(), SortPrimer<PrimerBind>());
+  
   // Output primers
   std::ofstream forfile(c.primfile.string().c_str());
   count = 0;
-  for(TPrimerBinds::iterator it = forBind.begin(); it != forBind.end(); ++it, ++count) {
+  for(TPrimerBinds::iterator it = allp.begin(); it != allp.end(); ++it, ++count) {
     forfile << "Primer_" << count << "_Tm="  << it->temp << std::endl;
-    forfile << "Primer_" << count << "_Pos="  <<  std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->pos << std::endl;
+    forfile << "Primer_" << count << "_Pos="  << std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->pos << std::endl;
     forfile << "Primer_" << count << "_Ori=";
     if (it->onFor) forfile << "forward" << std::endl;
     else forfile << "reverse" << std::endl;
