@@ -78,11 +78,9 @@ struct Config {
 struct PrimerBind {
   uint32_t refIndex;
   uint32_t pos;
-  uint32_t leng;
+  uint32_t primerId;
   bool onFor;
   double temp;
-  std::string primerName;
-  std::string seq;
   std::string genSeq;
 };
 
@@ -99,14 +97,12 @@ struct PcrProduct {
   uint32_t leng;
   uint32_t forPos;
   uint32_t revPos;
+  uint32_t forId;
+  uint32_t revId;
   double forTemp;
   double revTemp;
   double penalty;
   std::string seq;
-  std::string forPrimer;
-  std::string forSeq;
-  std::string revPrimer;
-  std::string revSeq;
 };
 
 template<typename TRecord>
@@ -121,7 +117,7 @@ template<typename TPrimerBinds>
 inline void
 addUnique(TPrimerBinds& coll, PrimerBind& prim) {  
   for(typename TPrimerBinds::iterator it = coll.begin(); it != coll.end(); ++it)
-    if ((prim.refIndex == it->refIndex) && (prim.pos == it->pos) && (prim.primerName.compare(it->primerName) == 0)) return;
+    if ((prim.refIndex == it->refIndex) && (prim.pos == it->pos) && (prim.primerId == it->primerId)) return;
   coll.push_back(prim);
 }
 
@@ -264,8 +260,10 @@ int main(int argc, char** argv) {
     std::cerr << "Input fasta file is missing: " << c.infile.string() << std::endl;
     return 1;
   }
-  typedef std::map<std::string, std::string> TInputFasta;
-  TInputFasta infa;
+  typedef std::vector<std::string> TPrimerName;
+  typedef std::vector<std::string> TPrimerSeq;
+  TPrimerName pName;
+  TPrimerSeq pSeq;
   std::ifstream fafile(c.infile.string().c_str());
   if (fafile.good()) {
     std::string fan;
@@ -275,7 +273,8 @@ int main(int argc, char** argv) {
       if (!line.empty()) {
 	if (line[0] == '>') {
 	  if ((!fan.empty()) && (!tmpfasta.empty())) {
-	    infa.insert(std::make_pair(fan, tmpfasta));
+	    pName.push_back(fan);
+	    pSeq.push_back(tmpfasta);
 	    tmpfasta = "";
 	  }
 	  fan = line.substr(1);
@@ -285,7 +284,8 @@ int main(int argc, char** argv) {
       }
     }
     if ((!fan.empty()) && (!tmpfasta.empty())) {
-      infa.insert(std::make_pair(fan, tmpfasta));
+      pName.push_back(fan);
+      pSeq.push_back(tmpfasta);
     }
   }
 
@@ -300,8 +300,8 @@ int main(int argc, char** argv) {
   typedef std::vector<PrimerBind> TPrimerBinds;
   TPrimerBinds forBind;
   TPrimerBinds revBind;  
-  for(TInputFasta::const_iterator itFa = infa.begin(); itFa != infa.end(); ++itFa) {
-    std::string qr = itFa->second;
+  for(uint32_t primerId = 0; primerId < pSeq.size(); ++primerId) {
+    std::string qr = pSeq[primerId];
     if (qr.size() < c.kmer) continue;
     int32_t koffset = qr.size() - c.kmer;
     qr = qr.substr(qr.size() - c.kmer);
@@ -358,7 +358,7 @@ int main(int argc, char** argv) {
 
 	    // thermodynamical alignemnt
 	    std::string genomicseq = pre + s.substr(0, m) + post;
-	    std::string primer = itFa->second;
+	    std::string primer = pSeq[primerId];
 	    if (fwdrev == 0) reverseComplement(primer);
 	    primer3thal::oligo1 = (unsigned char*) primer.c_str();
 	    primer3thal::oligo2 = (unsigned char*) genomicseq.c_str();
@@ -373,20 +373,16 @@ int main(int argc, char** argv) {
             PrimerBind prim;
             prim.refIndex = refIndex;
             prim.temp = o.temp;
-            prim.primerName = itFa->first;
-            prim.leng = 0;
-            prim.seq = itFa->second;
+            prim.primerId = primerId;
             prim.genSeq = genomicseq;
             if (o.temp > c.cutTemp) {
               if (fwdrev == 0) {
                 prim.onFor = true;
                 prim.pos = chrpos - its->fivePrim;
-                //forBind.push_back(prim);
                 addUnique(forBind, prim);
               } else {
                 prim.onFor = false;
                 prim.pos = chrpos + its->threePrim;
-                //revBind.push_back(prim);
                 addUnique(revBind, prim);
               }
             }
@@ -398,7 +394,7 @@ int main(int argc, char** argv) {
 	      AlignConfig<true, false> semiglobal;
 	      DnaScore<int> sc(5, -4, -4, -4);
 	      int32_t score = 0;
-	      primer = itFa->second;
+	      primer = pSeq[primerId];
 	      if (fwdrev == 0) score = needle(primer, genomicseq, align, semiglobal, sc);
 	      else {
 		reverseComplement(primer);
@@ -408,7 +404,7 @@ int main(int argc, char** argv) {
 	      if (fwdrev == 0) std::cerr << " fwd";
 	      else std::cerr << " rev";
 	      std::cerr << " temp:" << o.temp;
-	      std::cerr << " hit:(" << qhits << "," << i << ") " << itFa->first << std::endl;
+	      std::cerr << " hit:(" << qhits << "," << i << ") " << pName[primerId] << std::endl;
 	      std::cerr << "AlignScore: " << score << std::endl;
 	      typedef typename TAlign::index TAIndex;
 	      for(TAIndex i = 0; i < (TAIndex) align.shape()[0]; ++i) {
@@ -436,12 +432,10 @@ int main(int argc, char** argv) {
         pcrProd.refIndex = fw->refIndex;
         pcrProd.forPos = fw->pos;
         pcrProd.forTemp = fw->temp;
-        pcrProd.forPrimer = fw->primerName;
-        pcrProd.forSeq = fw->seq;
+        pcrProd.forId = fw->primerId;
         pcrProd.revPos = rv->pos;
         pcrProd.revTemp = rv->temp;
-        pcrProd.revPrimer = rv->primerName;
-        pcrProd.revSeq = rv->seq;
+        pcrProd.revId = rv->primerId;
         pcrProd.seq = "stest";
         // Calculate Penalty
         double pen = std::abs(c.targetTemp - fw->temp) * c.penDiff;
@@ -466,12 +460,12 @@ int main(int argc, char** argv) {
     rfile << "Amplicon_" << count << "_Penalty=" << it->penalty << std::endl;
     rfile << "Amplicon_" << count << "_For_Pos=" << std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->forPos << std::endl;
     rfile << "Amplicon_" << count << "_For_Tm=" << it->forTemp << std::endl;
-    rfile << "Amplicon_" << count << "_For_Name=" << it->forPrimer << std::endl;
-    rfile << "Amplicon_" << count << "_For_Seq=" << it->forSeq << std::endl;
+    rfile << "Amplicon_" << count << "_For_Name=" << pName[it->forId] << std::endl;
+    rfile << "Amplicon_" << count << "_For_Seq=" << pSeq[it->forId] << std::endl;
     rfile << "Amplicon_" << count << "_Rev_Pos=" << std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->revPos << std::endl;
     rfile << "Amplicon_" << count << "_Rev_Tm=" << it->revTemp << std::endl;
-    rfile << "Amplicon_" << count << "_Rev_Name=" << it->revPrimer << std::endl;
-    rfile << "Amplicon_" << count << "_Rev_Seq=" << it->revSeq << std::endl;
+    rfile << "Amplicon_" << count << "_Rev_Name=" << pName[it->revId] << std::endl;
+    rfile << "Amplicon_" << count << "_Rev_Seq=" << pSeq[it->revId] << std::endl;
     rfile << "Amplicon_" << count << "_Seq=" << it->seq<< std::endl;
   }
   rfile.close();
@@ -489,8 +483,8 @@ int main(int argc, char** argv) {
     forfile << "Primer_" << count << "_Ori=";
     if (it->onFor) forfile << "forward" << std::endl;
     else forfile << "reverse" << std::endl;
-    forfile << "Primer_" << count << "_Name"  << it->primerName << std::endl;
-    forfile << "Primer_" << count << "_Seq="  << it->seq << std::endl;
+    forfile << "Primer_" << count << "_Name="  << pName[it->primerId] << std::endl;
+    forfile << "Primer_" << count << "_Seq="  << pSeq[it->primerId] << std::endl;
     forfile << "Primer_" << count << "_Genome="  << it->genSeq << std::endl;
   }
   forfile.close();
