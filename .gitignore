@@ -3,6 +3,10 @@
 .boost
 src/fmsearch
 src/sdslLite/
+fm/
+data/
+ws/nohup.out
+*.pyc
 
 # Prerequisites
 *.d

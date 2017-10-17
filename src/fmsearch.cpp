@@ -71,7 +71,6 @@ struct Config {
   std::size_t max_locations;
   boost::filesystem::path outfile;
   boost::filesystem::path primfile;
-  boost::filesystem::path resfile;
   boost::filesystem::path infile;
   boost::filesystem::path genome;
 };
@@ -184,8 +183,7 @@ int main(int argc, char** argv) {
   outp.add_options()
     ("prefix,p", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(3), "prefix length")
     ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(3), "suffix length")
-    ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("out.fa"), "output file")
-    ("amplicon,a", boost::program_options::value<boost::filesystem::path>(&c.resfile)->default_value("amplicons.txt"), "amplicon file")
+    ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("amplicons.txt"), "output file")
     ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primers.fa"), "primer locations file")
     ("align,x", "write alignments to stderr")
     ;
@@ -303,7 +301,6 @@ int main(int argc, char** argv) {
   TAlphabet alphabet(tmp, tmp + sizeof(tmp) / sizeof(tmp[0]));
 
   // Query FM-Index
-  std::ofstream ofile(c.outfile.string().c_str());
   now = boost::posix_time::second_clock::local_time();
   std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Query FM-Index" << std::endl;
   std::vector<primerBind> forBind;
@@ -399,14 +396,6 @@ int main(int argc, char** argv) {
               }
             }
                            
-	    // Output fasta
-	    ofile << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos;
-	    if (fwdrev == 0) ofile << " fwd";
-	    else ofile << " rev";
-	    ofile << " temp:" << o.temp;
-	    ofile << " hit:(" << qhits << "," << i << ") " << itFa->first << std::endl;
-	    ofile << genomicseq << std::endl;
-
 	    // Debug alignment output
 	    if (c.align) {
 	      typedef boost::multi_array<char, 2> TAlign;
@@ -440,7 +429,6 @@ int main(int argc, char** argv) {
       }
     }
   }
-  ofile.close();
 
   // Find PCR products
   pcrProduct pcrProd;
@@ -476,7 +464,7 @@ int main(int argc, char** argv) {
 
   std::sort(pcrColl.begin(), pcrColl.end(), sortProducts());
 
-  std::ofstream rfile(c.resfile.string().c_str());
+  std::ofstream rfile(c.outfile.string().c_str());
   int count = 0;
   for(std::vector<pcrProduct>::iterator it = pcrColl.begin(); it != pcrColl.end(); ++it) {
     rfile << "Amplicon_" << count << "_Length=" << it->leng << std::endl;
