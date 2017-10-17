@@ -75,60 +75,54 @@ struct Config {
   boost::filesystem::path genome;
 };
 
-struct primerBind {
-  std::string chrom;
+struct PrimerBind {
+  uint32_t refIndex;
   uint32_t pos;
+  uint32_t leng;
   bool onFor;
   double temp;
-  std::string primer;
-  uint32_t leng;
+  std::string primerName;
   std::string seq;
   std::string genSeq;
 };
 
-struct sortPrimer
+template<typename TRecord>
+struct SortPrimer : public std::binary_function<TRecord, TRecord, bool>
 {
-    inline bool operator() (const primerBind& a, const primerBind& b)
-    {
-        return (a.temp > b.temp);
-    }
+  inline bool operator()(TRecord const& a, TRecord const& b) const {
+    return (a.temp > b.temp);
+  }
 };
 
-struct pcrProduct {
-  std::string chrom;
+struct PcrProduct {
+  uint32_t refIndex;
   uint32_t leng;
+  uint32_t forPos;
+  uint32_t revPos;
+  double forTemp;
+  double revTemp;
   double penalty;
   std::string seq;
-  uint32_t forPos;
-  double forTemp;
   std::string forPrimer;
   std::string forSeq;
-   uint32_t revPos;
-  double revTemp;
   std::string revPrimer;
   std::string revSeq;
 };
 
-struct sortProducts
+template<typename TRecord>
+struct SortProducts : public std::binary_function<TRecord, TRecord, bool>
 {
-    inline bool operator() (const pcrProduct& a, const pcrProduct& b)
-    {
-        return (a.penalty < b.penalty);
-    }
+  inline bool operator()(TRecord const& a, TRecord const& b) const {
+    return (a.penalty < b.penalty);
+  }
 };
 
-void addUniqe(std::vector<primerBind>* coll, primerBind* prim) {
-  int found = 0;
-  for(std::vector<primerBind>::iterator it = coll->begin(); it != coll->end(); ++it) {
-    if ((prim->chrom.compare(it->chrom) == 0) &&
-        (prim->pos - it->pos == 0) && 
-        (prim->primer.compare(it->primer) == 0)){
-      found = 1;
-    }
-  }
-  if (found == 0) {
-    coll->push_back(*prim);
-  }
+template<typename TPrimerBinds>
+inline void
+addUnique(TPrimerBinds& coll, PrimerBind& prim) {  
+  for(typename TPrimerBinds::iterator it = coll.begin(); it != coll.end(); ++it)
+    if ((prim.refIndex == it->refIndex) && (prim.pos == it->pos) && (prim.primerName.compare(it->primerName) == 0)) return;
+  coll.push_back(prim);
 }
 
 
@@ -303,8 +297,9 @@ int main(int argc, char** argv) {
   // Query FM-Index
   now = boost::posix_time::second_clock::local_time();
   std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Query FM-Index" << std::endl;
-  std::vector<primerBind> forBind;
-  std::vector<primerBind> revBind;  
+  typedef std::vector<PrimerBind> TPrimerBinds;
+  TPrimerBinds forBind;
+  TPrimerBinds revBind;  
   for(TInputFasta::const_iterator itFa = infa.begin(); itFa != infa.end(); ++itFa) {
     std::string qr = itFa->second;
     if (qr.size() < c.kmer) continue;
@@ -375,10 +370,10 @@ int main(int argc, char** argv) {
 	    }
 
             // Score suitable primers
-            primerBind prim;
-            prim.chrom = std::string(faidx_iseq(fai, refIndex));
+            PrimerBind prim;
+            prim.refIndex = refIndex;
             prim.temp = o.temp;
-            prim.primer = itFa->first;
+            prim.primerName = itFa->first;
             prim.leng = 0;
             prim.seq = itFa->second;
             prim.genSeq = genomicseq;
@@ -387,12 +382,12 @@ int main(int argc, char** argv) {
                 prim.onFor = true;
                 prim.pos = chrpos - its->fivePrim;
                 //forBind.push_back(prim);
-                addUniqe(&forBind, &prim);
+                addUnique(forBind, prim);
               } else {
                 prim.onFor = false;
                 prim.pos = chrpos + its->threePrim;
                 //revBind.push_back(prim);
-                addUniqe(&revBind, &prim);
+                addUnique(revBind, prim);
               }
             }
                            
@@ -431,21 +426,21 @@ int main(int argc, char** argv) {
   }
 
   // Find PCR products
-  pcrProduct pcrProd;
-  std::vector<pcrProduct> pcrColl;
-  for(std::vector<primerBind>::iterator fw = forBind.begin(); fw != forBind.end(); ++fw) {
-    for(std::vector<primerBind>::iterator rv = revBind.begin(); rv != revBind.end(); ++rv) {
-      if ((fw->chrom.compare(rv->chrom) == 0) &&
-          (rv->pos - fw->pos < c.maxProdSize)){
+  typedef std::vector<PcrProduct> TPcrProducts;
+  TPcrProducts pcrColl;
+  for(TPrimerBinds::iterator fw = forBind.begin(); fw != forBind.end(); ++fw) {
+    for(TPrimerBinds::iterator rv = revBind.begin(); rv != revBind.end(); ++rv) {
+      if ((fw->refIndex == rv->refIndex) && (rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
+	PcrProduct pcrProd;
         pcrProd.leng = rv->pos - fw->pos;
-        pcrProd.chrom = fw->chrom;
+        pcrProd.refIndex = fw->refIndex;
         pcrProd.forPos = fw->pos;
         pcrProd.forTemp = fw->temp;
-        pcrProd.forPrimer = fw->primer;
+        pcrProd.forPrimer = fw->primerName;
         pcrProd.forSeq = fw->seq;
         pcrProd.revPos = rv->pos;
         pcrProd.revTemp = rv->temp;
-        pcrProd.revPrimer = rv->primer;
+        pcrProd.revPrimer = rv->primerName;
         pcrProd.revSeq = rv->seq;
         pcrProd.seq = "stest";
         // Calculate Penalty
@@ -455,48 +450,48 @@ int main(int argc, char** argv) {
         pen += pcrProd.leng * c.penLen;
 
         pcrProd.penalty = pen;
-        if ((c.cutofPen < 0) || (pen < c.cutofPen)) {
-          pcrColl.push_back(pcrProd);
-        }
+        if ((c.cutofPen < 0) || (pen < c.cutofPen)) pcrColl.push_back(pcrProd);
       }
     }
   }
 
-  std::sort(pcrColl.begin(), pcrColl.end(), sortProducts());
+  // Sort by penalty
+  std::sort(pcrColl.begin(), pcrColl.end(), SortProducts<PcrProduct>());
 
+  // Output amplicons
   std::ofstream rfile(c.outfile.string().c_str());
-  int count = 0;
-  for(std::vector<pcrProduct>::iterator it = pcrColl.begin(); it != pcrColl.end(); ++it) {
+  int32_t count = 0;
+  for(TPcrProducts::iterator it = pcrColl.begin(); it != pcrColl.end(); ++it, ++count) {
     rfile << "Amplicon_" << count << "_Length=" << it->leng << std::endl;
     rfile << "Amplicon_" << count << "_Penalty=" << it->penalty << std::endl;
-    rfile << "Amplicon_" << count << "_For_Pos=" << it->chrom << ":" << it->forPos << std::endl;
+    rfile << "Amplicon_" << count << "_For_Pos=" << std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->forPos << std::endl;
     rfile << "Amplicon_" << count << "_For_Tm=" << it->forTemp << std::endl;
     rfile << "Amplicon_" << count << "_For_Name=" << it->forPrimer << std::endl;
     rfile << "Amplicon_" << count << "_For_Seq=" << it->forSeq << std::endl;
-    rfile << "Amplicon_" << count << "_Rev_Pos=" << it->chrom << ":" << it->revPos << std::endl;
+    rfile << "Amplicon_" << count << "_Rev_Pos=" << std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->revPos << std::endl;
     rfile << "Amplicon_" << count << "_Rev_Tm=" << it->revTemp << std::endl;
     rfile << "Amplicon_" << count << "_Rev_Name=" << it->revPrimer << std::endl;
     rfile << "Amplicon_" << count << "_Rev_Seq=" << it->revSeq << std::endl;
     rfile << "Amplicon_" << count << "_Seq=" << it->seq<< std::endl;
-    count++;
   }
   rfile.close();
 
-  //Print Primers
+  // Sort Primers on temperature
   forBind.insert( forBind.end(), revBind.begin(), revBind.end() );
-  std::sort(forBind.begin(), forBind.end(), sortPrimer());
+  std::sort(forBind.begin(), forBind.end(), SortPrimer<PrimerBind>());
+
+  // Output primers
   std::ofstream forfile(c.primfile.string().c_str());
   count = 0;
-  for(std::vector<primerBind>::iterator it = forBind.begin(); it != forBind.end(); ++it) {
+  for(TPrimerBinds::iterator it = forBind.begin(); it != forBind.end(); ++it, ++count) {
     forfile << "Primer_" << count << "_Tm="  << it->temp << std::endl;
-    forfile << "Primer_" << count << "_Pos="  <<  it->chrom << ":" << it->pos << std::endl;
+    forfile << "Primer_" << count << "_Pos="  <<  std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->pos << std::endl;
     forfile << "Primer_" << count << "_Ori=";
     if (it->onFor) forfile << "forward" << std::endl;
     else forfile << "reverse" << std::endl;
-    forfile << "Primer_" << count << "_Name"  << it->primer << std::endl;
+    forfile << "Primer_" << count << "_Name"  << it->primerName << std::endl;
     forfile << "Primer_" << count << "_Seq="  << it->seq << std::endl;
     forfile << "Primer_" << count << "_Genome="  << it->genSeq << std::endl;
-    count++;
   }
   forfile.close();
 
