@@ -435,7 +435,7 @@ int main(int argc, char** argv) {
   std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Find PCR Products" << std::endl;
   typedef std::vector<PcrProduct> TPcrProducts;
   TPcrProducts pcrColl;
-  for(uint32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
+  for(int32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
     for(TPrimerBinds::iterator fw = forBind[refIndex].begin(); fw != forBind[refIndex].end(); ++fw) {
       for(TPrimerBinds::iterator rv = revBind[refIndex].begin(); rv != revBind[refIndex].end(); ++rv) {
 	if ((rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
@@ -487,7 +487,7 @@ int main(int argc, char** argv) {
 
   // Collect all primers
   TPrimerBinds allp;  
-  for(uint32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
+  for(int32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
     allp.insert( allp.end(), forBind[refIndex].begin(), forBind[refIndex].end() );
     allp.insert( allp.end(), revBind[refIndex].begin(), revBind[refIndex].end() );
   }
