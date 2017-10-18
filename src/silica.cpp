@@ -115,15 +115,13 @@ struct SortProducts : public std::binary_function<TRecord, TRecord, bool>
 
 template<typename TPrimerBinds>
 inline void
-addUnique(TPrimerBinds& coll, PrimerBind& prim, uint32_t const distance, bool const indel) {
+addUnique(TPrimerBinds& coll, PrimerBind& prim, uint32_t const distance) {
   uint32_t idx = 0;
   for(typename TPrimerBinds::iterator it = coll.begin(); it != coll.end(); ++it, ++idx) {
-    if (prim.primerId == it->primerId) {
-      if ( ((!indel) && (prim.pos == it->pos)) || ((indel)  && (prim.pos + 2*distance >= it->pos) && (prim.pos <= it->pos + 2*distance)) ) {
-	// Duplicate, find best temp
-	if (prim.temp > it->temp) coll[idx] = prim;
-	return;
-      }
+    if ((prim.primerId == it->primerId) && (prim.pos + 2*distance >= it->pos) && (prim.pos <= it->pos + 2*distance)) {
+      // Duplicate, find best temp
+      if (prim.temp > it->temp) coll[idx] = prim;
+      return;
     }
   }
   // No other primer found
@@ -148,6 +146,8 @@ int main(int argc, char** argv) {
   generic.add_options()
     ("help,?", "show help message")
     ("genome,g", boost::program_options::value<boost::filesystem::path>(&c.genome), "genome file")
+    ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("ampl.txt"), "amplicon output file")
+    ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primers.fa"), "primer locations file")
     ;
 
   boost::program_options::options_description appr("Approximate Search Options");
@@ -160,10 +160,10 @@ int main(int argc, char** argv) {
 
   boost::program_options::options_description score("Parameters for Scoring and Penalty Calculation");
   score.add_options()
-    ("cutTemp,c", boost::program_options::value<double>(&c.cutTemp)->default_value(40.0), "minimal primer meting temperature to consider")
-    ("maxProdSize,l", boost::program_options::value<uint32_t>(&c.maxProdSize)->default_value(15000), "maximal PCR Product size amplified")
-    ("targetTm", boost::program_options::value<double>(&c.targetTemp)->default_value(58.0), "intended target Tm for primers")
-    ("CutoffPenalty", boost::program_options::value<double>(&c.cutofPen)->default_value(-1.0), "maximal penalty for products to consider, -1 = keep all")
+    ("cutTemp,c", boost::program_options::value<double>(&c.cutTemp)->default_value(40.0), "min. primer melting temperature")
+    ("maxProdSize,l", boost::program_options::value<uint32_t>(&c.maxProdSize)->default_value(15000), "max. PCR Product size")
+    ("targetTm", boost::program_options::value<double>(&c.targetTemp)->default_value(58.0), "target Tm for primers")
+    ("CutoffPenalty", boost::program_options::value<double>(&c.cutofPen)->default_value(-1.0), "max. penalty for products (-1 = keep all)")
     ("penaltyTmDiff", boost::program_options::value<double>(&c.penDiff)->default_value(0.2), "multiplication factor for deviation of primer Tm penalty")
     ("penaltyTmMismatch", boost::program_options::value<double>(&c.penMis)->default_value(0.4), "multiplication factor for Tm pair difference penalty")
     ("penaltyLength", boost::program_options::value<double>(&c.penLen)->default_value(0.001), "multiplication factor for amplicon length penalty")
@@ -178,27 +178,19 @@ int main(int argc, char** argv) {
     ("dntp", boost::program_options::value<double>(&a.dntp)->default_value(0.6), "the sum  of all dNTPs in mMol")
     ;
 
-  boost::program_options::options_description outp("Output Options");
-  outp.add_options()
-    ("prefix,r", boost::program_options::value<std::size_t>(&c.pre_context)->default_value(3), "prefix length")
-    ("suffix,s", boost::program_options::value<std::size_t>(&c.post_context)->default_value(3), "suffix length")
-    ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("amplicons.txt"), "output file")
-    ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primers.fa"), "primer locations file")
-    ("align,x", "write alignments to stderr")
-    ;
-    
   boost::program_options::options_description hidden("Hidden options");
   hidden.add_options()
     ("input-file", boost::program_options::value<boost::filesystem::path>(&c.infile), "seq.fasta")
+    ("align", "write alignments to stderr")
     ;
 
   boost::program_options::positional_options_description pos_args;
   pos_args.add("input-file", -1);
 
   boost::program_options::options_description cmdline_options;
-  cmdline_options.add(generic).add(appr).add(score).add(tmcalc).add(outp).add(hidden);
+  cmdline_options.add(generic).add(appr).add(score).add(tmcalc).add(hidden);
   boost::program_options::options_description visible_options;
-  visible_options.add(generic).add(appr).add(score).add(tmcalc).add(outp);
+  visible_options.add(generic).add(appr).add(score).add(tmcalc);
   boost::program_options::variables_map vm;
   boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(cmdline_options).positional(pos_args).run(), vm);
   boost::program_options::notify(vm);
@@ -215,6 +207,14 @@ int main(int argc, char** argv) {
   else c.align = true;
   if (!vm.count("hamming")) c.indel = true;
   else c.indel = false;
+
+  // Set prefix and suffix based on edit distance
+  c.pre_context = 2;
+  c.post_context = 2;
+  if (c.indel) {
+    c.pre_context += c.distance;
+    c.post_context += c.distance;
+  }
 
   // Fix provided Temperature
   a.temp += primer3thal::ABSOLUTE_ZERO;
@@ -380,51 +380,26 @@ int main(int argc, char** argv) {
 	    }
 
             // Score suitable primers
-            PrimerBind prim;
-	    prim.refIndex = refIndex;
-            prim.temp = o.temp;
-            prim.primerId = primerId;
-            prim.genSeq = genomicseq;
-            if (o.temp > c.cutTemp) {
+	    if (o.temp > c.cutTemp) {
+	      PrimerBind prim;
+	      prim.refIndex = refIndex;
+	      prim.temp = o.temp;
+	      prim.primerId = primerId;
+	      prim.genSeq = genomicseq;
+	      prim.pos = chrpos;
               if (fwdrev == 0) {
                 prim.onFor = true;
-                prim.pos = chrpos;
-                addUnique(forBind[refIndex], prim, c.distance, c.indel);
+                if (c.indel) addUnique(forBind[refIndex], prim, c.distance);
+		else forBind[refIndex].push_back(prim);
               } else {
                 prim.onFor = false;
-                prim.pos = chrpos;
-                addUnique(revBind[refIndex], prim, c.distance, c.indel);
+                if (c.indel) addUnique(revBind[refIndex], prim, c.distance);
+		else revBind[refIndex].push_back(prim);
               }
             }
                            
 	    // Debug alignment output
-	    if (c.align) {
-	      typedef boost::multi_array<char, 2> TAlign;
-	      TAlign align;
-	      AlignConfig<true, false> semiglobal;
-	      DnaScore<int> sc(5, -4, -4, -4);
-	      int32_t score = 0;
-	      primer = pSeq[primerId];
-	      if (fwdrev == 0) score = needle(primer, genomicseq, align, semiglobal, sc);
-	      else {
-		reverseComplement(primer);
-		score = needle(primer, genomicseq, align, semiglobal, sc);
-	      }
-	      std::cerr << ">" << std::string(faidx_iseq(fai, refIndex)) << ":" << chrpos;
-	      if (fwdrev == 0) std::cerr << " fwd";
-	      else std::cerr << " rev";
-	      std::cerr << " temp:" << o.temp;
-	      std::cerr << " hit:(" << qhits << "," << i << ") " << pName[primerId] << std::endl;
-	      std::cerr << "AlignScore: " << score << std::endl;
-	      typedef typename TAlign::index TAIndex;
-	      for(TAIndex i = 0; i < (TAIndex) align.shape()[0]; ++i) {
-		for(TAIndex j = 0; j < (TAIndex) align.shape()[1]; ++j) {
-		  std::cerr << align[i][j];
-		}
-		std::cerr << std::endl;
-	      }
-	      std::cerr << std::endl;
-	    }	    
+	    //if (c.align) _debugAlignment(pSeq[primerId], genomicseq, fwdrev);
 	  }
 	}
       }

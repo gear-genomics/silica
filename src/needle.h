@@ -96,6 +96,33 @@ namespace silica
     return needle(a1, a2, align, ac);
   }
 
+
+  inline void
+  _debugAlignment(std::string const& pr, std::string const& genomicseq, int32_t const fwdrev) {
+    typedef boost::multi_array<char, 2> TAlign;
+    TAlign align;
+    AlignConfig<true, false> semiglobal;
+    DnaScore<int> sc(5, -4, -4, -4);
+    int32_t score = 0;
+    std::string primer(pr);
+    if (fwdrev == 0) score = needle(primer, genomicseq, align, semiglobal, sc);
+    else {
+      reverseComplement(primer);
+      score = needle(primer, genomicseq, align, semiglobal, sc);
+    }
+    if (fwdrev == 0) std::cerr << ">fwd";
+    else std::cerr << ">rev";
+    std::cerr << " AlignScore: " << score << std::endl;
+    typedef typename TAlign::index TAIndex;
+    for(TAIndex i = 0; i < (TAIndex) align.shape()[0]; ++i) {
+      for(TAIndex j = 0; j < (TAIndex) align.shape()[1]; ++j) {
+	std::cerr << align[i][j];
+      }
+      std::cerr << std::endl;
+    }
+    std::cerr << std::endl;
+  }
+
 }
 
 #endif
