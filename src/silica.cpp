@@ -59,7 +59,6 @@ struct Config {
   bool align;
   double cutTemp;
   uint32_t maxProdSize;
-  double targetTemp;
   double cutofPen;
   double penDiff;
   double penMis;
@@ -81,6 +80,7 @@ struct PrimerBind {
   uint32_t primerId;
   bool onFor;
   double temp;
+  double perfTemp;
   std::string genSeq;
 };
 
@@ -146,8 +146,8 @@ int main(int argc, char** argv) {
   generic.add_options()
     ("help,?", "show help message")
     ("genome,g", boost::program_options::value<boost::filesystem::path>(&c.genome), "genome file")
-    ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("ampl.txt"), "amplicon output file")
-    ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primers.fa"), "primer locations file")
+    ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("amplicons.txt"), "amplicon output file")
+    ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primers.txt"), "primer locations file")
     ;
 
   boost::program_options::options_description appr("Approximate Search Options");
@@ -162,9 +162,8 @@ int main(int argc, char** argv) {
   score.add_options()
     ("cutTemp,c", boost::program_options::value<double>(&c.cutTemp)->default_value(40.0), "min. primer melting temperature")
     ("maxProdSize,l", boost::program_options::value<uint32_t>(&c.maxProdSize)->default_value(15000), "max. PCR Product size")
-    ("targetTm", boost::program_options::value<double>(&c.targetTemp)->default_value(58.0), "target Tm for primers")
     ("CutoffPenalty", boost::program_options::value<double>(&c.cutofPen)->default_value(-1.0), "max. penalty for products (-1 = keep all)")
-    ("penaltyTmDiff", boost::program_options::value<double>(&c.penDiff)->default_value(0.2), "multiplication factor for deviation of primer Tm penalty")
+    ("penaltyTmDiff", boost::program_options::value<double>(&c.penDiff)->default_value(0.6), "multiplication factor for deviation of primer Tm penalty")
     ("penaltyTmMismatch", boost::program_options::value<double>(&c.penMis)->default_value(0.4), "multiplication factor for Tm pair difference penalty")
     ("penaltyLength", boost::program_options::value<double>(&c.penLen)->default_value(0.001), "multiplication factor for amplicon length penalty")
     ;
@@ -335,7 +334,19 @@ int main(int argc, char** argv) {
 	itsEnd = revset.end();
       }
       for(; its != itsEnd; ++its, ++qhits) {
-	std::string query(*its);
+        std::string query(*its);
+        std::string forQuery = pSeq[primerId];
+	std::string revQuery = pSeq[primerId];
+        reverseComplement(revQuery);
+	primer3thal::oligo1 = (unsigned char*) forQuery.c_str();
+	primer3thal::oligo2 = (unsigned char*) revQuery.c_str();
+	primer3thal::thal_results oi;
+	bool thalsuccess1 = primer3thal::thal(primer3thal::oligo1, primer3thal::oligo2, &a, &oi);
+	if ((!thalsuccess1) || (oi.temp == primer3thal::THAL_ERROR_SCORE)) {
+	  std::cerr << "Error during thermodynamical calculation!" << std::endl;
+	  return -1;
+	}
+        double matchTemp = oi.temp;
 	std::size_t m = query.size();
 	std::size_t occs = sdsl::count(fm_index, query.begin(), query.end());
 	if (occs > 0) {
@@ -384,15 +395,17 @@ int main(int argc, char** argv) {
 	      PrimerBind prim;
 	      prim.refIndex = refIndex;
 	      prim.temp = o.temp;
+              prim.perfTemp = matchTemp;
 	      prim.primerId = primerId;
 	      prim.genSeq = genomicseq;
-	      prim.pos = chrpos;
               if (fwdrev == 0) {
                 prim.onFor = true;
+                prim.pos = chrpos;
                 if (c.indel) addUnique(forBind[refIndex], prim, c.distance);
 		else forBind[refIndex].push_back(prim);
               } else {
                 prim.onFor = false;
+                prim.pos = chrpos + pSeq[primerId].size() - 1; 
                 if (c.indel) addUnique(revBind[refIndex], prim, c.distance);
 		else revBind[refIndex].push_back(prim);
               }
@@ -425,13 +438,26 @@ int main(int argc, char** argv) {
 	  pcrProd.revId = rv->primerId;
 	  pcrProd.seq = "stest";
 	  // Calculate Penalty
-	  double pen = std::abs(c.targetTemp - fw->temp) * c.penDiff;
-	  pen += std::abs(c.targetTemp - rv->temp) * c.penDiff;
+	  double pen = (fw->perfTemp - fw->temp) * c.penDiff;
+          if (pen < 0) pen = 0;
+	  double bpen = (rv->perfTemp - rv->temp) * c.penDiff;
+          if (bpen > 0) pen += bpen;
 	  pen += std::abs(fw->temp - rv->temp) * c.penMis;
 	  pen += pcrProd.leng * c.penLen;
 
 	  pcrProd.penalty = pen;
-	  if ((c.cutofPen < 0) || (pen < c.cutofPen)) pcrColl.push_back(pcrProd);
+	  if ((c.cutofPen < 0) || (pen < c.cutofPen)) {
+            std::size_t chromoff = 0;
+            for(int i = 0  ; i < refIndex; i++) chromoff += seqlen[refIndex];
+            std::size_t forw = fw->pos + chromoff;
+            std::size_t reve = rv->pos + chromoff;
+            std::cout << "[1 " << forw  << " - " << reve << " - " << chromoff << std::endl;
+ 
+//            auto prod = extract(fm_index, forw, reve - 1);
+//            pcrProd.seq = prod;	     
+            std::cout << "[2 " << forw  << " - " << reve << " - " << chromoff << std::endl;
+            pcrColl.push_back(pcrProd);
+          }
 	}
       }
     }
@@ -480,6 +506,7 @@ int main(int argc, char** argv) {
     if (it->onFor) forfile << "forward" << std::endl;
     else forfile << "reverse" << std::endl;
     forfile << "Primer_" << count << "_Name="  << pName[it->primerId] << std::endl;
+    forfile << "Primer_" << count << "_MatchTm="  << it->perfTemp << std::endl;
     forfile << "Primer_" << count << "_Seq="  << pSeq[it->primerId] << std::endl;
     forfile << "Primer_" << count << "_Genome="  << it->genSeq << std::endl;
   }
