@@ -424,6 +424,9 @@ int main(int argc, char** argv) {
   typedef std::vector<PcrProduct> TPcrProducts;
   TPcrProducts pcrColl;
   for(int32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
+    int32_t sl = -1;
+    std::string seqname(faidx_iseq(fai, refIndex));
+    char* seq = faidx_fetch_seq(fai, seqname.c_str(), 0, faidx_seq_len(fai, seqname.c_str()), &sl);
     for(TPrimerBinds::iterator fw = forBind[refIndex].begin(); fw != forBind[refIndex].end(); ++fw) {
       for(TPrimerBinds::iterator rv = revBind[refIndex].begin(); rv != revBind[refIndex].end(); ++rv) {
 	if ((rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
@@ -447,20 +450,13 @@ int main(int argc, char** argv) {
 
 	  pcrProd.penalty = pen;
 	  if ((c.cutofPen < 0) || (pen < c.cutofPen)) {
-            std::size_t chromoff = 0;
-            for(int i = 0  ; i < refIndex; i++) chromoff += seqlen[refIndex];
-            std::size_t forw = fw->pos + chromoff;
-            std::size_t reve = rv->pos + chromoff;
-            std::cout << "[1 " << forw  << " - " << reve << " - " << chromoff << std::endl;
- 
-//            auto prod = extract(fm_index, forw, reve - 1);
-//            pcrProd.seq = prod;	     
-            std::cout << "[2 " << forw  << " - " << reve << " - " << chromoff << std::endl;
+	    pcrProd.seq = boost::to_upper_copy(std::string(seq + pcrProd.forPos, seq + pcrProd.revPos));
             pcrColl.push_back(pcrProd);
           }
 	}
       }
     }
+    free(seq);
   }
 
   // Sort by penalty
