@@ -11,7 +11,27 @@ Installing
 
 `make all`
 
+Install Genome Index
+--------------------
+
+Currently done by Indigo, place in fm folder.
+
 Running
 -------
 
 `./src/silica -g hg19.fa.gz sequences.fasta`
+
+Install Web Interface
+---------------------
+
+`sudo apt install python python-pip`
+
+`pip install flask`
+
+Running local
+-------------
+
+`cd ws`
+
+`python silica.py -b "" -dt`
+
