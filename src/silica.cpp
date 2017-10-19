@@ -395,17 +395,17 @@ int main(int argc, char** argv) {
 	      PrimerBind prim;
 	      prim.refIndex = refIndex;
 	      prim.temp = o.temp;
-              prim.perfTemp = matchTemp;
+	      prim.perfTemp = matchTemp;
 	      prim.primerId = primerId;
 	      prim.genSeq = genomicseq;
               if (fwdrev == 0) {
                 prim.onFor = true;
-                prim.pos = chrpos;
+                prim.pos = chrpos + c.kmer - pSeq[primerId].size() - 1;
                 if (c.indel) addUnique(forBind[refIndex], prim, c.distance);
 		else forBind[refIndex].push_back(prim);
               } else {
                 prim.onFor = false;
-                prim.pos = chrpos + pSeq[primerId].size() - 1; 
+                prim.pos = chrpos + m - c.kmer + pSeq[primerId].size(); 
                 if (c.indel) addUnique(revBind[refIndex], prim, c.distance);
 		else revBind[refIndex].push_back(prim);
               }
