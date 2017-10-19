@@ -54,7 +54,7 @@ def upload_file():
       # Fasta file
       primerData = request.form['fastaText']
       primerFile = 'direct.fa'
-      if 'fasta' not in request.files:
+      if 'fasta' in request.files:
          ffa = request.files['fasta']
          if ffa.filename != '':
             if allowed_file(ffa.filename):
