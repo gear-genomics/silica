@@ -18,13 +18,24 @@
 	<div class="container">
 	    <div class="page-header">
 		<h1>Silica: In-Silico PCR Amplification</h1>
-		<p>Analysis takes a couple of seconds to run, please be patient.</p>
+                <p>Run a virtual insilico PCR with a set of primers on a selected genome.<br />
+                   Multiple primer pairs are allowed, off target products will be shown if present.</p>
+ 		<p>Analysis takes a couple of seconds to run, please be patient.</p>
 		<p><a href="https://www-db.embl.de/EMBLPersonGroup-PersonPicture/MailForm/?recipient=CP-60010497">Help</a></p>
 	    </div>
 
 	    <form action = "{{ baseurl }}/upload" method = "POST" enctype = "multipart/form-data">
+                <div class="form-group">
+                <label for="fastaText">Paste pimers in Fasta format</label>
+                    <br>
+                    <label class="btn btn-default btn-textarea">
+                        <textarea class="form-control" id="fastaText" name="fastaText" rows="10" cols="50">{{ example }}</textarea>
+                    </label>
+                </div>
+                <p></p>
+                <p></p>
 		<div class="form-group">
-		    <label for="fasta">Primer Fasta file (.fa)</label>
+		    <label for="fasta">or upload Fasta file (.fa)</label>
 		    <br>
 		    <label class="btn btn-default btn-file">
 			<input type="file" name="fasta" id="fasta" hidden />
@@ -34,9 +45,10 @@
 		<p></p>
 		<div id="gindex" class="tab-pane fade in active">
 		    <div class="form-group">
-			<input class="span2" id="genome" name="genome" type="hidden" />
+			<input class="span2" id="genome" name="genome" type="hidden"{% if example %} value='Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz'{% endif %}/>
+			<label for="dropdown">and select genome</label>
 			<div class="dropdown">
-			    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">Genome 
+			    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">  {% if example %}Homo Sapiens GRCh37{% else %}Genome{% endif %} 
 				<span class="caret"></span></button>
 			    <ul class="dropdown-menu" role="menu">
 				<li onclick="$('#genome').val('Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz')"><a href="#">A. thaliana TAIR10</a></li>
@@ -53,6 +65,7 @@
 		</div>
 		<p></p>
 		<button type = "submit" name = "submit" value = "0" class = "btn btn-primary">Run Silica</button>
+		<button type = "submit" name = "submit" value = "Load Test Data" class = "btn btn-secondary">Load Test Data</button>
 		<p></p>
 	    </form>
 	    {% if error %}

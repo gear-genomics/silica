@@ -45,7 +45,16 @@ def upload_file():
       if not os.path.exists(sf):
          os.makedirs(sf)
 
+      # Load Test Data
+      if request.form['submit'] == 'Load Test Data':
+         testData = '>FGA_f\nGCCCCATAGGTTTTGAACTCA\n>FGA_r\nTGATTTGTCTGTAATTGCCAGC'
+         return render_template('upload.html', baseurl = app.config['BASEURL'], example = testData)
+
+
       # Fasta file
+
+
+
       if 'fasta' not in request.files:
          error = "Fasta file missing!"
          return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
