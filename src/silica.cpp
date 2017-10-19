@@ -102,7 +102,6 @@ struct PcrProduct {
   double forTemp;
   double revTemp;
   double penalty;
-  std::string seq;
 };
 
 template<typename TRecord>
@@ -424,9 +423,6 @@ int main(int argc, char** argv) {
   typedef std::vector<PcrProduct> TPcrProducts;
   TPcrProducts pcrColl;
   for(int32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
-    int32_t sl = -1;
-    std::string seqname(faidx_iseq(fai, refIndex));
-    char* seq = faidx_fetch_seq(fai, seqname.c_str(), 0, faidx_seq_len(fai, seqname.c_str()), &sl);
     for(TPrimerBinds::iterator fw = forBind[refIndex].begin(); fw != forBind[refIndex].end(); ++fw) {
       for(TPrimerBinds::iterator rv = revBind[refIndex].begin(); rv != revBind[refIndex].end(); ++rv) {
 	if ((rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
@@ -439,7 +435,6 @@ int main(int argc, char** argv) {
 	  pcrProd.revPos = rv->pos;
 	  pcrProd.revTemp = rv->temp;
 	  pcrProd.revId = rv->primerId;
-	  pcrProd.seq = "stest";
 	  // Calculate Penalty
 	  double pen = (fw->perfTemp - fw->temp) * c.penDiff;
           if (pen < 0) pen = 0;
@@ -447,16 +442,11 @@ int main(int argc, char** argv) {
           if (bpen > 0) pen += bpen;
 	  pen += std::abs(fw->temp - rv->temp) * c.penMis;
 	  pen += pcrProd.leng * c.penLen;
-
 	  pcrProd.penalty = pen;
-	  if ((c.cutofPen < 0) || (pen < c.cutofPen)) {
-	    pcrProd.seq = boost::to_upper_copy(std::string(seq + pcrProd.forPos, seq + pcrProd.revPos));
-            pcrColl.push_back(pcrProd);
-          }
+	  if ((c.cutofPen < 0) || (pen < c.cutofPen)) pcrColl.push_back(pcrProd);
 	}
       }
     }
-    free(seq);
   }
 
   // Sort by penalty
@@ -468,17 +458,22 @@ int main(int argc, char** argv) {
   std::ofstream rfile(c.outfile.string().c_str());
   int32_t count = 0;
   for(TPcrProducts::iterator it = pcrColl.begin(); it != pcrColl.end(); ++it, ++count) {
+    std::string chrom(faidx_iseq(fai, it->refIndex));
     rfile << "Amplicon_" << count << "_Length=" << it->leng << std::endl;
     rfile << "Amplicon_" << count << "_Penalty=" << it->penalty << std::endl;
-    rfile << "Amplicon_" << count << "_For_Pos=" << std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->forPos << std::endl;
+    rfile << "Amplicon_" << count << "_For_Pos=" << chrom << ":" << it->forPos << std::endl;
     rfile << "Amplicon_" << count << "_For_Tm=" << it->forTemp << std::endl;
     rfile << "Amplicon_" << count << "_For_Name=" << pName[it->forId] << std::endl;
     rfile << "Amplicon_" << count << "_For_Seq=" << pSeq[it->forId] << std::endl;
-    rfile << "Amplicon_" << count << "_Rev_Pos=" << std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->revPos << std::endl;
+    rfile << "Amplicon_" << count << "_Rev_Pos=" << chrom << ":" << it->revPos << std::endl;
     rfile << "Amplicon_" << count << "_Rev_Tm=" << it->revTemp << std::endl;
     rfile << "Amplicon_" << count << "_Rev_Name=" << pName[it->revId] << std::endl;
     rfile << "Amplicon_" << count << "_Rev_Seq=" << pSeq[it->revId] << std::endl;
-    rfile << "Amplicon_" << count << "_Seq=" << it->seq<< std::endl;
+    int32_t sl = -1;
+    char* seq = faidx_fetch_seq(fai, chrom.c_str(), it->forPos, it->revPos, &sl);
+    std::string seqstr = boost::to_upper_copy(std::string(seq));
+    rfile << "Amplicon_" << count << "_Seq=" << seqstr << std::endl;
+    free(seq);
   }
   rfile.close();
 
