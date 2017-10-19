@@ -46,33 +46,34 @@ def upload_file():
          os.makedirs(sf)
 
       # Load Test Data
-      if request.form['submit'] == 'Load Test Data':
+      if request.form['submit'] == 'Load Example Data':
          testData = '>FGA_f\nGCCCCATAGGTTTTGAACTCA\n>FGA_r\nTGATTTGTCTGTAATTGCCAGC'
          return render_template('upload.html', baseurl = app.config['BASEURL'], example = testData)
 
 
       # Fasta file
-
-
-
+      primerData = request.form['fastaText']
+      primerFile = 'direct.fa'
       if 'fasta' not in request.files:
-         error = "Fasta file missing!"
+         ffa = request.files['fasta']
+         if ffa.filename != '':
+            if allowed_file(ffa.filename):
+               primerData += '\n' + ffa.read()
+               primerFile = secure_filename(ffa.filename)
+      if  primerData == '':
+         error = "Please provide a set of primers!"
          return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
-      ffa = request.files['fasta']
-      if ffa.filename == '':
-         error = "Fasta file missing!"
-         return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
-      if not allowed_file(ffa.filename):
-         error = "Fasta file has incorrect file type!"
-         return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
-      ffaname = os.path.join(sf, "silica_" + uuidstr + "_" + secure_filename(ffa.filename))
-      ffa.save(ffaname)
+      ffaname = os.path.join(sf, "silica_" + uuidstr + "_" + primerFile)
+      primerData = primerData.replace('\r\n','\n')
+      with open(ffaname, "w") as primFile:
+         primFile.write(primerData)
+    #  ffa.save(ffaname)
 
       # Genome
       val = request.form.get("submit", "None provided")
       genome = request.form['genome']
       if genome == '':
-         error = "Genome index is missing!"
+         error = "Please select a genome!"
          return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
       genome = os.path.join(app.config['SILICA'], "fm", genome)
 
