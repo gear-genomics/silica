@@ -27,7 +27,7 @@ def is_valid_uuid(s):
 @app.route('/download/<uuid>')
 def download(uuid):
    if is_valid_uuid(uuid):
-      filename = "silica_" + uuid + ".txt";
+      filename = "silica_" + uuid + "_amplicons.txt";
       if allowed_file(filename):
          sf = os.path.join(app.config['UPLOAD_FOLDER'], uuid[0:2])
          if os.path.exists(sf):
@@ -49,7 +49,6 @@ def upload_file():
       if request.form['submit'] == 'Load Example Data':
          testData = '>FGA_f\nGCCCCATAGGTTTTGAACTCA\n>FGA_r\nTGATTTGTCTGTAATTGCCAGC'
          return render_template('upload.html', baseurl = app.config['BASEURL'], example = testData)
-
 
       # Fasta file
       primerData = request.form['fastaText']
@@ -78,14 +77,24 @@ def upload_file():
       genome = os.path.join(app.config['SILICA'], "fm", genome)
 
       # Run Rscript
-      outfile = os.path.join(sf, "silica_" + uuidstr + ".txt")
-      prfile = os.path.join(sf, "silica_" + uuidstr + ".primer")
+      outfile = os.path.join(sf, "silica_" + uuidstr + "_amplicons.txt")
+      prfile = os.path.join(sf, "silica_" + uuidstr + "_primer.txt")
+      paramfile = os.path.join(sf, "silica_" + uuidstr + "_parameter.txt")
       logfile = os.path.join(sf, "silica_" + uuidstr + ".log")
       errfile = os.path.join(sf, "silica_" + uuidstr + ".err")
       with open(logfile, "w") as log:
          with open(errfile, "w") as err:
-            slexe = os.path.join(app.config['SILICA'], "./src/silica")
-            return_code = call([slexe, '-g', genome, '-o', outfile, '-p', prfile, ffaname], stdout=log, stderr=err)
+            with open(paramfile, "w") as param:
+               param.write("genome=" + genome + '\n')
+               setAmpSize = onlyFloat(request.form['setAmpSize'])
+               param.write("maxProdSize=" + setAmpSize + '\n')
+               setTmCutoff = onlyInt(request.form['setTmCutoff'])
+               param.write("cutTemp=" + setTmCutoff + '\n')
+
+               slexe = os.path.join(app.config['SILICA'], "./src/silica")
+               return_code = call([slexe, '-g', genome, '-o', outfile,
+                                          '--cutTemp', setTmCutoff, '--maxProdSize', setAmpSize,
+                                          '-p', prfile, ffaname], stdout=log, stderr=err)
       if return_code != 0:
          error = "Error in running Silica!"
          return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
@@ -97,6 +106,16 @@ def upload_file():
 @app.route("/")
 def submit():
     return render_template("upload.html", baseurl = app.config['BASEURL'])
+
+def onlyFloat(txt):
+    txt = re.sub('[^0-9,.]g' , '', txt)
+    txt = re.sub('[,]g' , '.', txt)
+    return txt
+
+def onlyInt(txt):
+    txt = onlyFloat(txt)
+    txt = re.sub('[,.]g' , '', txt)
+    return txt
 
 if __name__ == '__main__':
    parser = argparse.ArgumentParser(description='Silica App')
