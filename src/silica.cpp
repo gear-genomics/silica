@@ -50,6 +50,7 @@ Contact: Tobias Rausch (rausch@embl.de)
 #include "align.h"
 #include "needle.h"
 #include "thal.h"
+#include "json.h"
 
 using namespace sdsl;
 using namespace silica;
@@ -68,6 +69,7 @@ struct Config {
   std::size_t pre_context;
   std::size_t post_context;
   std::size_t max_locations;
+  std::string format;
   boost::filesystem::path outfile;
   boost::filesystem::path primfile;
   boost::filesystem::path infile;
@@ -147,6 +149,7 @@ int main(int argc, char** argv) {
     ("genome,g", boost::program_options::value<boost::filesystem::path>(&c.genome), "genome file")
     ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("amplicons.txt"), "amplicon output file")
     ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primers.txt"), "primer locations file")
+    ("format,f", boost::program_options::value<std::string>(&c.format)->default_value("txt"), "output format (json or txt)")
     ;
 
   boost::program_options::options_description appr("Approximate Search Options");
@@ -459,27 +462,8 @@ int main(int argc, char** argv) {
   // Output amplicons
   now = boost::posix_time::second_clock::local_time();
   std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Output Amplicons" << std::endl;
-  std::ofstream rfile(c.outfile.string().c_str());
-  int32_t count = 0;
-  for(TPcrProducts::iterator it = pcrColl.begin(); it != pcrColl.end(); ++it, ++count) {
-    std::string chrom(faidx_iseq(fai, it->refIndex));
-    rfile << "Amplicon_" << count << "_Length=" << it->leng << std::endl;
-    rfile << "Amplicon_" << count << "_Penalty=" << it->penalty << std::endl;
-    rfile << "Amplicon_" << count << "_For_Pos=" << chrom << ":" << it->forPos << std::endl;
-    rfile << "Amplicon_" << count << "_For_Tm=" << it->forTemp << std::endl;
-    rfile << "Amplicon_" << count << "_For_Name=" << pName[it->forId] << std::endl;
-    rfile << "Amplicon_" << count << "_For_Seq=" << pSeq[it->forId] << std::endl;
-    rfile << "Amplicon_" << count << "_Rev_Pos=" << chrom << ":" << it->revPos << std::endl;
-    rfile << "Amplicon_" << count << "_Rev_Tm=" << it->revTemp << std::endl;
-    rfile << "Amplicon_" << count << "_Rev_Name=" << pName[it->revId] << std::endl;
-    rfile << "Amplicon_" << count << "_Rev_Seq=" << pSeq[it->revId] << std::endl;
-    int32_t sl = -1;
-    char* seq = faidx_fetch_seq(fai, chrom.c_str(), it->forPos, it->revPos, &sl);
-    std::string seqstr = boost::to_upper_copy(std::string(seq));
-    rfile << "Amplicon_" << count << "_Seq=" << seqstr << std::endl;
-    free(seq);
-  }
-  rfile.close();
+  if (c.format == "json") ampliconJsonOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
+  else ampliconTxtOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
 
   // Collect all primers
   TPrimerBinds allp;  
@@ -493,7 +477,7 @@ int main(int argc, char** argv) {
   
   // Output primers
   std::ofstream forfile(c.primfile.string().c_str());
-  count = 0;
+  int32_t count = 0;
   for(TPrimerBinds::iterator it = allp.begin(); it != allp.end(); ++it, ++count) {
     forfile << "Primer_" << count << "_Tm="  << it->temp << std::endl;
     forfile << "Primer_" << count << "_Pos="  << std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->pos << std::endl;
