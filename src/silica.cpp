@@ -476,20 +476,8 @@ int main(int argc, char** argv) {
   std::sort(allp.begin(), allp.end(), SortPrimer<PrimerBind>());
   
   // Output primers
-  std::ofstream forfile(c.primfile.string().c_str());
-  int32_t count = 0;
-  for(TPrimerBinds::iterator it = allp.begin(); it != allp.end(); ++it, ++count) {
-    forfile << "Primer_" << count << "_Tm="  << it->temp << std::endl;
-    forfile << "Primer_" << count << "_Pos="  << std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->pos << std::endl;
-    forfile << "Primer_" << count << "_Ori=";
-    if (it->onFor) forfile << "forward" << std::endl;
-    else forfile << "reverse" << std::endl;
-    forfile << "Primer_" << count << "_Name="  << pName[it->primerId] << std::endl;
-    forfile << "Primer_" << count << "_MatchTm="  << it->perfTemp << std::endl;
-    forfile << "Primer_" << count << "_Seq="  << pSeq[it->primerId] << std::endl;
-    forfile << "Primer_" << count << "_Genome="  << it->genSeq << std::endl;
-  }
-  forfile.close();
+  if (c.format == "json") primerJsonOut(c.primfile.string(), fai, allp, pName, pSeq);
+  else primerTxtOut(c.primfile.string(), fai, allp, pName, pSeq);
 
   // Clean-up
   primer3thal::destroy_thal_structures();

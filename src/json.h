@@ -50,6 +50,26 @@ using namespace sdsl;
 
 namespace silica {
 
+
+template<typename TPrimerBinds, typename TPrimerName, typename TPrimerSeq>
+inline void
+primerTxtOut(std::string const& outfile, faidx_t* fai, TPrimerBinds const& allp, TPrimerName const& pName, TPrimerSeq const& pSeq) {
+  std::ofstream forfile(outfile.c_str());
+  int32_t count = 0;
+  for(typename TPrimerBinds::const_iterator it = allp.begin(); it != allp.end(); ++it, ++count) {
+    forfile << "Primer_" << count << "_Tm="  << it->temp << std::endl;
+    forfile << "Primer_" << count << "_Pos="  << std::string(faidx_iseq(fai, it->refIndex)) << ":" << it->pos << std::endl;
+    forfile << "Primer_" << count << "_Ori=";
+    if (it->onFor) forfile << "forward" << std::endl;
+    else forfile << "reverse" << std::endl;
+    forfile << "Primer_" << count << "_Name="  << pName[it->primerId] << std::endl;
+    forfile << "Primer_" << count << "_MatchTm="  << it->perfTemp << std::endl;
+    forfile << "Primer_" << count << "_Seq="  << pSeq[it->primerId] << std::endl;
+    forfile << "Primer_" << count << "_Genome="  << it->genSeq << std::endl;
+  }
+  forfile.close();
+}
+
 template<typename TPcrProducts, typename TPrimerName, typename TPrimerSeq>
 inline void
 ampliconTxtOut(std::string const& outfile, faidx_t* fai, TPcrProducts const& pcrColl, TPrimerName const& pName, TPrimerSeq const& pSeq) {
@@ -76,6 +96,32 @@ ampliconTxtOut(std::string const& outfile, faidx_t* fai, TPcrProducts const& pcr
   rfile.close();
 }
 
+template<typename TPrimerBinds, typename TPrimerName, typename TPrimerSeq>
+inline void
+primerJsonOut(std::string const& outfile, faidx_t* fai, TPrimerBinds const& allp, TPrimerName const& pName, TPrimerSeq const& pSeq) {
+  std::ofstream forfile(outfile.c_str());
+  int32_t count = 0;
+  forfile << "[" << std::endl;
+  for(typename TPrimerBinds::const_iterator it = allp.begin(); it != allp.end(); ++it, ++count) {
+    std::string chrom(faidx_iseq(fai, it->refIndex));
+    if (count) forfile << "," << std::endl;
+    forfile << "{\"Id\": " << count << ", ";
+    forfile << "\"Tm\": "  << it->temp << ", ";
+    forfile << "\"Chrom\": \"" << chrom << "\", ";
+    forfile << "\"Pos\": "  << it->pos << ", ";
+    forfile << "\"Ori\": \"";
+    if (it->onFor) forfile << "forward" << "\", ";
+    else forfile << "reverse" << "\", ";
+    forfile << "\"Name\": \""  << pName[it->primerId] << "\", ";
+    forfile << "\"MatchTm\": "  << it->perfTemp << ", ";
+    forfile << "\"Seq\": \""  << pSeq[it->primerId] << "\", ";
+    forfile << "\"Genome\": \""  << it->genSeq << "\"}";
+  }
+  forfile << std::endl;
+  forfile << "]" << std::endl;
+  forfile.close();
+}
+  
 template<typename TPcrProducts, typename TPrimerName, typename TPrimerSeq>
 inline void
 ampliconJsonOut(std::string const& outfile, faidx_t* fai, TPcrProducts const& pcrColl, TPrimerName const& pName, TPrimerSeq const& pSeq) {
