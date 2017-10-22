@@ -41,6 +41,7 @@ def results(uuid):
    amplicons = []
    primers = []
    showAmp = 0
+   showPri = 0
    amphtml = ''
    primhtml = ''
    prStart = 0;
@@ -52,16 +53,18 @@ def results(uuid):
    if request.method == 'POST':
       if request.form['submit'] == 'Back to Submit Form':
          return redirect(app.config['BASEURL'] + "../../upload", code=302)
-
-
+      prStart = int(onlyInt(request.form['prStart']))
+      amStart = int(onlyInt(request.form['amStart']))
       if request.form['submit'] == 'Amp Up':
          amStart -= step
       if request.form['submit'] == 'Amp Down':
          amStart += step
       if request.form['submit'] == 'Prim Up':
          prStart -= step
+         showPri = 1
       if request.form['submit'] == 'Prim Down':
          prStart += step
+         showPri = 1
 
    if is_valid_uuid(uuid):
       sf = os.path.join(app.config['UPLOAD_FOLDER'], uuid[0:2])
@@ -75,26 +78,27 @@ def results(uuid):
             if os.path.isfile(os.path.join(sf, primfilename)):
                primers = json.loads(open(os.path.join(sf, primfilename)).read())
    if len(amplicons) > 0:
-      showAmp = 1
+      if showPri == 0:
+         showAmp = 1
       if amStart + step < len(amplicons):
          moreAmp = 1
          lastAmp = amStart + step
       else:
          lastAmp = len(amplicons)
       amphtml += '<h3>Showing Amplicons ' + str(amStart + 1) +' - ' + str(lastAmp) + '</h3>\n<p>'
-      for a in amplicons:
-         amphtml += '<h3>Amplicon ' + str(a['Id'] + 1) +'</h3>\n<p>'
-         amphtml += '<strong>Length:</strong> ' + str(a['Length']) +' bp<br />\n'
-         amphtml += '<strong>Penalty:</strong> ' + str(a['Penalty']) +'<br />\n'
-         amphtml += '<strong>Location:</strong> ' + str(a['Chrom']) + ':' + str(a['ForPos']) + '-' + str(a['RevPos'])+'<br />\n'
-         amphtml += '<strong>Forward Primer Name:</strong> ' + str(a['ForName']) +'<br />\n'
-         amphtml += '<strong>Forward Primer Tm:</strong> ' + str(a['ForTm']) +'&deg;C<br />\n'
-         amphtml += '<strong>Forward Primer Sequence:</strong> ' + str(a['ForSeq']) +'<br />\n'
-         amphtml += '<strong>Reverse Primer Name:</strong> ' + str(a['RevName']) +'<br />\n'
-         amphtml += '<strong>Reverse Primer Tm:</strong> ' + str(a['RevTm']) +'&deg;C<br />\n'
-         amphtml += '<strong>Reverse Primer Sequence:</strong> ' + str(a['RevSeq']) +'<br />\n'
+      for a in range(amStart, lastAmp):
+         amphtml += '<h3>Amplicon ' + str(amplicons[a]['Id'] + 1) +'</h3>\n<p>'
+         amphtml += '<strong>Length:</strong> ' + str(amplicons[a]['Length']) +' bp<br />\n'
+         amphtml += '<strong>Penalty:</strong> ' + str(amplicons[a]['Penalty']) +'<br />\n'
+         amphtml += '<strong>Location:</strong> ' + str(amplicons[a]['Chrom']) + ':' + str(amplicons[a]['ForPos']) + '-' + str(amplicons[a]['RevPos'])+'<br />\n'
+         amphtml += '<strong>Forward Primer Name:</strong> ' + str(amplicons[a]['ForName']) +'<br />\n'
+         amphtml += '<strong>Forward Primer Tm:</strong> ' + str(amplicons[a]['ForTm']) +'&deg;C<br />\n'
+         amphtml += '<strong>Forward Primer Sequence:</strong> ' + str(amplicons[a]['ForSeq']) +'<br />\n'
+         amphtml += '<strong>Reverse Primer Name:</strong> ' + str(amplicons[a]['RevName']) +'<br />\n'
+         amphtml += '<strong>Reverse Primer Tm:</strong> ' + str(amplicons[a]['RevTm']) +'&deg;C<br />\n'
+         amphtml += '<strong>Reverse Primer Sequence:</strong> ' + str(amplicons[a]['RevSeq']) +'<br />\n'
          amphtml += '<strong>Amplicon Sequence:</strong><br /><pre>'
-         splitSeq = str(a['Seq'])
+         splitSeq = str(amplicons[a]['Seq'])
          for i in range(0, len(splitSeq)):
             if i % 60 == 0 and i != 0:
                amphtml += '<br />'
@@ -109,22 +113,22 @@ def results(uuid):
       else:
          lastPri = len(primers)
       primhtml += '<h3>Showing Primers ' + str(prStart + 1) +' - ' + str(lastPri) + '</h3>\n<p>'
-      for a in primers:
-         primhtml += '<h3>Primer Binding Site ' + str(a['Id'] + 1) +'</h3>\n<p>'
-         primhtml += '<strong>Primer Tm:</strong> ' + str(a['Tm']) +'&deg;C<br />\n'
-         if str(a['Ori']) == 'reverse':
-            startPos = int(a['Pos']) - len(str(a['Seq']))
-            endPos = str(a['Pos'])
+      for a in range(prStart, lastPri):
+         primhtml += '<h3>Primer Binding Site ' + str(primers[a]['Id'] + 1) +'</h3>\n<p>'
+         primhtml += '<strong>Primer Tm:</strong> ' + str(primers[a]['Tm']) +'&deg;C<br />\n'
+         if str(primers[a]['Ori']) == 'reverse':
+            startPos = int(primers[a]['Pos']) - len(str(primers[a]['Seq']))
+            endPos = str(primers[a]['Pos'])
             loc = ' on reverse'
          else:
-            startPos = str(a['Pos'])
-            endPos = int(a['Pos']) + len(str(a['Seq']))
+            startPos = str(primers[a]['Pos'])
+            endPos = int(primers[a]['Pos']) + len(str(primers[a]['Seq']))
             loc = ' on forward'
-         primhtml += '<strong>Location:</strong> ' + str(a['Chrom']) + ':' + str(startPos) + '-' + str(endPos) + loc + '<br />\n'
-         primhtml += '<strong>Pos:</strong> ' + str(a['Pos']) + '<br />\n'
-         primhtml += '<strong>Primer Name:</strong> ' + str(a['Name']) +'<br />\n'
-         primhtml += '<strong>Primer Sequence:</strong> ' + str(a['Seq']) +'<br />\n'
-         primhtml += '<strong>Genome Sequence:</strong> ' + str(a['Genome']) +'<br />\n'
+         primhtml += '<strong>Location:</strong> ' + str(primers[a]['Chrom']) + ':' + str(startPos) + '-' + str(endPos) + loc + '<br />\n'
+         primhtml += '<strong>Pos:</strong> ' + str(primers[a]['Pos']) + '<br />\n'
+         primhtml += '<strong>Primer Name:</strong> ' + str(primers[a]['Name']) +'<br />\n'
+         primhtml += '<strong>Primer Sequence:</strong> ' + str(primers[a]['Seq']) +'<br />\n'
+         primhtml += '<strong>Genome Sequence:</strong> ' + str(primers[a]['Genome']) +'<br />\n'
          primhtml += '</p>'
 
    return render_template('results.html', baseurl = app.config['BASEURL']+ "/results/" + uuid, uuid=uuid, 
