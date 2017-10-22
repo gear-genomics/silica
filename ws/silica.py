@@ -3,6 +3,7 @@ import uuid
 import re
 import subprocess
 import argparse
+import json
 from subprocess import call
 from flask import Flask, send_file, flash, render_template, request, redirect, url_for
 from werkzeug.utils import secure_filename
@@ -33,6 +34,103 @@ def download(uuid):
          if os.path.exists(sf):
             if os.path.isfile(os.path.join(sf, filename)):
                return send_file(os.path.join(sf, filename), attachment_filename=filename)
+   return "File does not exist!"
+
+@app.route('/results/<uuid>', methods = ['GET', 'POST'])
+def results(uuid):
+   amplicons = []
+   primers = []
+   showAmp = 0
+   amphtml = ''
+   primhtml = ''
+   prStart = 0;
+   amStart = 0;
+   step = 30;
+   moreAmp = 0;
+   morePri = 0;
+
+   if request.method == 'POST':
+      if request.form['submit'] == 'Back to Submit Form':
+         return redirect(app.config['BASEURL'] + "../../upload", code=302)
+
+
+      if request.form['submit'] == 'Amp Up':
+         amStart -= step
+      if request.form['submit'] == 'Amp Down':
+         amStart += step
+      if request.form['submit'] == 'Prim Up':
+         prStart -= step
+      if request.form['submit'] == 'Prim Down':
+         prStart += step
+
+   if is_valid_uuid(uuid):
+      sf = os.path.join(app.config['UPLOAD_FOLDER'], uuid[0:2])
+      if os.path.exists(sf):
+         ampfilename = "silica_" + uuid + "_amplicons.txt";
+         if allowed_file(ampfilename):
+            if os.path.isfile(os.path.join(sf, ampfilename)):
+               amplicons = json.loads(open(os.path.join(sf, ampfilename)).read())
+         primfilename = "silica_" + uuid + "_primer.txt";
+         if allowed_file(primfilename):
+            if os.path.isfile(os.path.join(sf, primfilename)):
+               primers = json.loads(open(os.path.join(sf, primfilename)).read())
+   if len(amplicons) > 0:
+      showAmp = 1
+      if amStart + step < len(amplicons):
+         moreAmp = 1
+         lastAmp = amStart + step
+      else:
+         lastAmp = len(amplicons)
+      amphtml += '<h3>Showing Amplicons ' + str(amStart + 1) +' - ' + str(lastAmp) + '</h3>\n<p>'
+      for a in amplicons:
+         amphtml += '<h3>Amplicon ' + str(a['Id'] + 1) +'</h3>\n<p>'
+         amphtml += '<strong>Length:</strong> ' + str(a['Length']) +' bp<br />\n'
+         amphtml += '<strong>Penalty:</strong> ' + str(a['Penalty']) +'<br />\n'
+         amphtml += '<strong>Location:</strong> ' + str(a['Chrom']) + ':' + str(a['ForPos']) + '-' + str(a['RevPos'])+'<br />\n'
+         amphtml += '<strong>Forward Primer Name:</strong> ' + str(a['ForName']) +'<br />\n'
+         amphtml += '<strong>Forward Primer Tm:</strong> ' + str(a['ForTm']) +'&deg;C<br />\n'
+         amphtml += '<strong>Forward Primer Sequence:</strong> ' + str(a['ForSeq']) +'<br />\n'
+         amphtml += '<strong>Reverse Primer Name:</strong> ' + str(a['RevName']) +'<br />\n'
+         amphtml += '<strong>Reverse Primer Tm:</strong> ' + str(a['RevTm']) +'&deg;C<br />\n'
+         amphtml += '<strong>Reverse Primer Sequence:</strong> ' + str(a['RevSeq']) +'<br />\n'
+         amphtml += '<strong>Amplicon Sequence:</strong><br /><pre>'
+         splitSeq = str(a['Seq'])
+         for i in range(0, len(splitSeq)):
+            if i % 60 == 0 and i != 0:
+               amphtml += '<br />'
+            amphtml += splitSeq[i] 
+         amphtml += '</pre><br />\n'
+         amphtml += '</p>'
+ 
+   if len(primers) > 0:
+      if prStart + step < len(primers):
+         morePri = 1
+         lastPri = prStart + step
+      else:
+         lastPri = len(primers)
+      primhtml += '<h3>Showing Primers ' + str(prStart + 1) +' - ' + str(lastPri) + '</h3>\n<p>'
+      for a in primers:
+         primhtml += '<h3>Primer Binding Site ' + str(a['Id'] + 1) +'</h3>\n<p>'
+         primhtml += '<strong>Primer Tm:</strong> ' + str(a['Tm']) +'&deg;C<br />\n'
+         if str(a['Ori']) == 'reverse':
+            startPos = int(a['Pos']) - len(str(a['Seq']))
+            endPos = str(a['Pos'])
+            loc = ' on reverse'
+         else:
+            startPos = str(a['Pos'])
+            endPos = int(a['Pos']) + len(str(a['Seq']))
+            loc = ' on forward'
+         primhtml += '<strong>Location:</strong> ' + str(a['Chrom']) + ':' + str(startPos) + '-' + str(endPos) + loc + '<br />\n'
+         primhtml += '<strong>Pos:</strong> ' + str(a['Pos']) + '<br />\n'
+         primhtml += '<strong>Primer Name:</strong> ' + str(a['Name']) +'<br />\n'
+         primhtml += '<strong>Primer Sequence:</strong> ' + str(a['Seq']) +'<br />\n'
+         primhtml += '<strong>Genome Sequence:</strong> ' + str(a['Genome']) +'<br />\n'
+         primhtml += '</p>'
+
+   return render_template('results.html', baseurl = app.config['BASEURL']+ "/results/" + uuid, uuid=uuid, 
+                          ampcount=len(amplicons), primecount=len(primers), showAmp=showAmp,
+                          amphtml=amphtml, primhtml=primhtml, prStart=prStart, amStart=amStart,
+                          moreAmp=moreAmp, morePri=morePri )
    return "File does not exist!"
 
 @app.route('/upload', methods = ['GET', 'POST'])
@@ -152,13 +250,14 @@ def upload_file():
                                           '--penaltyTmMismatch', setPenTmMismatch, '--penaltyLength', setPenLength,
                                           '--monovalent', setCtmMv, '--divalent', setCtmDv,
                                           '--dna', setCtmDNA, '--dntp', setCtmDNTP,
+                                          '-f', 'json',
                                           ffaname], stdout=log, stderr=err)
       if return_code != 0:
          error = "Error in running Silica!"
          return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
 
       # Send download pdf
-      return redirect(app.config['BASEURL'] + "/download/" + uuidstr, code=302)
+      return redirect(app.config['BASEURL'] + "/results/" + uuidstr, code=302)
    return render_template('upload.html', baseurl = app.config['BASEURL'])
 
 @app.route("/")
