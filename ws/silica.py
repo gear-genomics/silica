@@ -86,15 +86,73 @@ def upload_file():
          with open(errfile, "w") as err:
             with open(paramfile, "w") as param:
                param.write("genome=" + genome + '\n')
-               setAmpSize = onlyFloat(request.form['setAmpSize'])
+               setAmpSize = onlyInt(request.form['setAmpSize'])
                param.write("maxProdSize=" + setAmpSize + '\n')
-               setTmCutoff = onlyInt(request.form['setTmCutoff'])
+               setTmCutoff = onlyFloat(request.form['setTmCutoff'])
                param.write("cutTemp=" + setTmCutoff + '\n')
+               if float(setTmCutoff) < 30.0:
+                  error = 'Mimnimal Primer Tm must be >= 30&deg;C'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
+               setKmer = onlyInt(request.form['setKmer'])
+               param.write("kmer=" + setKmer + '\n')
+               if int(setKmer) < 15:
+                  error = 'Number of bp Used to Seach for Matches must be > 14 bp'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
+               setEDis = onlyInt(request.form['setDist'])
+               param.write("distance=" + setEDis + '\n')
+               if int(setEDis) != 0 and int(setEDis) != 1:
+                  error = 'Maximal Allowed Number of Mutations must be 0 or 1'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
+               setCutoffPen = onlyFloat(request.form['setCutoffPen'])
+               param.write("cutoffPenalty=" + setCutoffPen + '\n')
+               if float(setCutoffPen) < 0.0 and int(setCutoffPen) != -1:
+                  error = 'Keep Only PCR Products with Penalty Below must be > 0.0 or -1'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
+               setPenTmDiff = onlyFloat(request.form['setPenTmDiff'])
+               param.write("penaltyTmDiff=" + setPenTmDiff + '\n')
+               if float(setPenTmDiff) < 0.0:
+                  error = 'Penalty Factor for Single Primer Tm Mismatch must be >= 0.0'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
+               setPenTmMismatch = onlyFloat(request.form['setPenTmMismatch'])
+               param.write("penaltyTmMismatch=" + setPenTmMismatch + '\n')
+               if float(setPenTmMismatch) < 0.0:
+                  error = 'Penalty Factor for Tm Mismatch of Primers in a Pair must be >= 0.0'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
+               setPenLength = onlyFloat(request.form['setPenLength'])
+               param.write("penaltyLength=" + setPenLength + '\n')
+               if float(setPenLength) < 0.0:
+                  error = 'Penalty Factor for PCR Product Length must be >= 0.0'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
+               setCtmMv = onlyFloat(request.form['setCtmMv'])
+               param.write("monovalent=" + setCtmMv + '\n')
+               if float(setCtmMv) < 0.0:
+                  error = 'Concentration of Monovalent Ions must be >= 0.0 mMol'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
+               setCtmDv = onlyFloat(request.form['setCtmDv'])
+               param.write("divalent=" + setCtmDv + '\n')
+               if float(setCtmDv) < 0.0:
+                  error = 'Concentration of Divalent Ions must be >= 0.0 mMol'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
+               setCtmDNA = onlyFloat(request.form['setCtmDNA'])
+               param.write("dna=" + setCtmDNA + '\n')
+               if float(setCtmDNA) < 0.1:
+                  error = 'Concentration of Annealing(!) Oligos must be >= 0.1 nMol'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
+               setCtmDNTP = onlyFloat(request.form['setCtmDNTP'])
+               param.write("dntp=" + setCtmDNTP + '\n')
+               if float(setCtmDNTP) < 0.0:
+                  error = 'Concentration of the Sum of All dNTPs must be >= 0.0 mMol'
+                  return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
 
                slexe = os.path.join(app.config['SILICA'], "./src/silica")
-               return_code = call([slexe, '-g', genome, '-o', outfile,
-                                          '--cutTemp', setTmCutoff, '--maxProdSize', setAmpSize,
-                                          '-p', prfile, ffaname], stdout=log, stderr=err)
+               return_code = call([slexe, '-g', genome, '-o', outfile, '-p', prfile,
+                                          '--maxProdSize', setAmpSize, '--cutTemp', setTmCutoff,
+                                          '--kmer', setKmer, '--distance', setEDis,
+                                          '--cutoffPenalty', setCutoffPen, '--penaltyTmDiff', setPenTmDiff,
+                                          '--penaltyTmMismatch', setPenTmMismatch, '--penaltyLength', setPenLength,
+                                          '--monovalent', setCtmMv, '--divalent', setCtmDv,
+                                          '--dna', setCtmDNA, '--dntp', setCtmDNTP,
+                                          ffaname], stdout=log, stderr=err)
       if return_code != 0:
          error = "Error in running Silica!"
          return render_template('upload.html', baseurl = app.config['BASEURL'], error = error)
@@ -108,14 +166,14 @@ def submit():
     return render_template("upload.html", baseurl = app.config['BASEURL'])
 
 def onlyFloat(txt):
-    txt = re.sub('[^0-9,.]g' , '', txt)
-    txt = re.sub('[,]g' , '.', txt)
+    onlyNumbDC = re.compile('[^0-9,.\-]')
+    txt = onlyNumbDC.sub( '', txt)
+    txt = txt.replace(',', '.')
     return txt
 
 def onlyInt(txt):
-    txt = onlyFloat(txt)
-    txt = re.sub('[,.]g' , '', txt)
-    return txt
+    onlyNumb = re.compile('[^0-9\-]')
+    return onlyNumb.sub( '', txt)
 
 if __name__ == '__main__':
    parser = argparse.ArgumentParser(description='Silica App')
