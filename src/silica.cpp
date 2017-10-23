@@ -313,7 +313,6 @@ int main(int argc, char** argv) {
   TChrPrimerBinds forBind(faidx_nseq(fai), TPrimerBinds());
   TChrPrimerBinds revBind(faidx_nseq(fai), TPrimerBinds());
   for(uint32_t primerId = 0; primerId < pSeq.size(); ++primerId) {
-    ++show_progress;
     std::string qr = pSeq[primerId];
     if (qr.size() < c.kmer) continue;
     int32_t koffset = qr.size() - c.kmer;
@@ -425,6 +424,7 @@ int main(int argc, char** argv) {
 	}
       }
     }
+    ++show_progress;
   }
   // Find PCR products
   now = boost::posix_time::second_clock::local_time();
