@@ -429,9 +429,11 @@ int main(int argc, char** argv) {
   // Find PCR products
   now = boost::posix_time::second_clock::local_time();
   std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Find PCR Products" << std::endl;
+  boost::progress_display sp( faidx_nseq(fai) );
   typedef std::vector<PcrProduct> TPcrProducts;
   TPcrProducts pcrColl;
   for(int32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
+    ++sp;
     for(TPrimerBinds::iterator fw = forBind[refIndex].begin(); fw != forBind[refIndex].end(); ++fw) {
       for(TPrimerBinds::iterator rv = revBind[refIndex].begin(); rv != revBind[refIndex].end(); ++rv) {
 	if ((rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
