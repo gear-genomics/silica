@@ -19,21 +19,37 @@ app.config['BASEURL'] = '/silica'
 
 
 def allowed_file(filename):
-   return '.' in filename and filename.rsplit('.', 1)[1].lower() in set(['fasta', 'fa', 'txt'])
+   return '.' in filename and filename.rsplit('.', 1)[1].lower() in set(['fasta', 'fa', 'json', 'csv', 'txt'])
 
-uuid_re = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+uuid_re = re.compile(r'(^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-{0,1}([ap]{0,1})([cj]{0,1})$')
 def is_valid_uuid(s):
    return uuid_re.match(s) is not None
 
 @app.route('/download/<uuid>')
 def download(uuid):
    if is_valid_uuid(uuid):
-      filename = "silica_" + uuid + "_amplicons.txt";
+      ma = uuid_re.match(uuid)
+      filename = "silica_" + ma.group(1)
+      downName = "silica"
+      if ma.group(2) == 'a':
+         filename += "_amplicons"
+         downName += "_amplicons"
+      else:
+         filename += "_primer"
+         downName += "_primer"
+      if ma.group(3) == 'c':
+         filename += ".csv"
+         downName += ".csv"
+         miType = 'text/csv'
+      else:
+         filename += ".json"
+         downName += ".json"
+         miType = 'text/json'
       if allowed_file(filename):
          sf = os.path.join(app.config['UPLOAD_FOLDER'], uuid[0:2])
          if os.path.exists(sf):
             if os.path.isfile(os.path.join(sf, filename)):
-               return send_file(os.path.join(sf, filename), attachment_filename=filename)
+               return send_file(os.path.join(sf, filename), mimetype=miType, as_attachment=True, attachment_filename=downName)
    return "File does not exist!"
 
 @app.route('/results/<uuid>', methods = ['GET', 'POST'])
@@ -69,11 +85,13 @@ def results(uuid):
    if is_valid_uuid(uuid):
       sf = os.path.join(app.config['UPLOAD_FOLDER'], uuid[0:2])
       if os.path.exists(sf):
-         ampfilename = "silica_" + uuid + "_amplicons.txt";
+         ampfilename = "silica_" + uuid + "_amplicons.json";
+         ampdlink = '<a href="' + app.config['BASEURL'] + '/download/' + uuid + '-ac">CSV</a> or <a href="' + app.config['BASEURL'] + '/download/' + uuid + '-aj">JSON</a>'
          if allowed_file(ampfilename):
             if os.path.isfile(os.path.join(sf, ampfilename)):
                amplicons = json.loads(open(os.path.join(sf, ampfilename)).read())
-         primfilename = "silica_" + uuid + "_primer.txt";
+         primfilename = "silica_" + uuid + "_primer.json";
+         primdlink = '<a href="' + app.config['BASEURL'] + '/download/' + uuid + '-pc">CSV</a> or <a href="' + app.config['BASEURL'] + '/download/' + uuid + '-pj">JSON</a>'
          if allowed_file(primfilename):
             if os.path.isfile(os.path.join(sf, primfilename)):
                primers = json.loads(open(os.path.join(sf, primfilename)).read())
@@ -85,7 +103,6 @@ def results(uuid):
          lastAmp = amStart + step
       else:
          lastAmp = len(amplicons)
-      amphtml += '<h3>Showing Amplicons ' + str(amStart + 1) +' - ' + str(lastAmp) + '</h3>\n<p>'
       for a in range(amStart, lastAmp):
          amphtml += '<h3>Amplicon ' + str(amplicons[a]['Id'] + 1) +'</h3>\n<p>'
          amphtml += '<strong>Length:</strong> ' + str(amplicons[a]['Length']) +' bp<br />\n'
@@ -112,7 +129,6 @@ def results(uuid):
          lastPri = prStart + step
       else:
          lastPri = len(primers)
-      primhtml += '<h3>Showing Primers ' + str(prStart + 1) +' - ' + str(lastPri) + '</h3>\n<p>'
       for a in range(prStart, lastPri):
          primhtml += '<h3>Primer Binding Site ' + str(primers[a]['Id'] + 1) +'</h3>\n<p>'
          primhtml += '<strong>Primer Tm:</strong> ' + str(primers[a]['Tm']) +'&deg;C<br />\n'
@@ -125,7 +141,6 @@ def results(uuid):
             endPos = int(primers[a]['Pos']) + len(str(primers[a]['Seq']))
             loc = ' on forward'
          primhtml += '<strong>Location:</strong> ' + str(primers[a]['Chrom']) + ':' + str(startPos) + '-' + str(endPos) + loc + '<br />\n'
-         primhtml += '<strong>Pos:</strong> ' + str(primers[a]['Pos']) + '<br />\n'
          primhtml += '<strong>Primer Name:</strong> ' + str(primers[a]['Name']) +'<br />\n'
          primhtml += '<strong>Primer Sequence:</strong> ' + str(primers[a]['Seq']) +'<br />\n'
          primhtml += '<strong>Genome Sequence:</strong> ' + str(primers[a]['Genome']) +'<br />\n'
@@ -134,7 +149,7 @@ def results(uuid):
    return render_template('results.html', baseurl = app.config['BASEURL']+ "/results/" + uuid, uuid=uuid, 
                           ampcount=len(amplicons), primecount=len(primers), showAmp=showAmp,
                           amphtml=amphtml, primhtml=primhtml, prStart=prStart, amStart=amStart,
-                          moreAmp=moreAmp, morePri=morePri )
+                          moreAmp=moreAmp, morePri=morePri, ampdlink=ampdlink, primdlink=primdlink )
    return "File does not exist!"
 
 @app.route('/upload', methods = ['GET', 'POST'])
@@ -179,8 +194,8 @@ def upload_file():
       genome = os.path.join(app.config['SILICA'], "fm", genome)
 
       # Run Rscript
-      outfile = os.path.join(sf, "silica_" + uuidstr + "_amplicons.txt")
-      prfile = os.path.join(sf, "silica_" + uuidstr + "_primer.txt")
+      outfile = os.path.join(sf, "silica_" + uuidstr + "_amplicons")
+      prfile = os.path.join(sf, "silica_" + uuidstr + "_primer")
       paramfile = os.path.join(sf, "silica_" + uuidstr + "_parameter.txt")
       logfile = os.path.join(sf, "silica_" + uuidstr + ".log")
       errfile = os.path.join(sf, "silica_" + uuidstr + ".err")
@@ -254,7 +269,7 @@ def upload_file():
                                           '--penaltyTmMismatch', setPenTmMismatch, '--penaltyLength', setPenLength,
                                           '--monovalent', setCtmMv, '--divalent', setCtmDv,
                                           '--dna', setCtmDNA, '--dntp', setCtmDNTP,
-                                          '-f', 'json',
+                                          '-f', 'jsoncsv',
                                           ffaname], stdout=log, stderr=err)
       if return_code != 0:
          error = "Error in running Silica!"

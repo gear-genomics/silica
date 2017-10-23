@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
     ("genome,g", boost::program_options::value<boost::filesystem::path>(&c.genome), "genome file")
     ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("amplicons.txt"), "amplicon output file")
     ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primers.txt"), "primer locations file")
-    ("format,f", boost::program_options::value<std::string>(&c.format)->default_value("txt"), "output format (json or txt)")
+    ("format,f", boost::program_options::value<std::string>(&c.format)->default_value("txt"), "output format (json, txt, csv or jsoncsv)")
     ;
 
   boost::program_options::options_description appr("Approximate Search Options");
@@ -467,6 +467,11 @@ int main(int argc, char** argv) {
   now = boost::posix_time::second_clock::local_time();
   std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Output Amplicons" << std::endl;
   if (c.format == "json") ampliconJsonOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
+  else if (c.format == "csv") ampliconCsvOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
+  else if (c.format == "jsoncsv") {
+    ampliconJsonOut(c.outfile.string() + ".json", fai, pcrColl, pName, pSeq);
+    ampliconCsvOut(c.outfile.string() + ".csv", fai, pcrColl, pName, pSeq);
+  }
   else ampliconTxtOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
 
   // Collect all primers
@@ -481,7 +486,12 @@ int main(int argc, char** argv) {
   
   // Output primers
   if (c.format == "json") primerJsonOut(c.primfile.string(), fai, allp, pName, pSeq);
-  else primerTxtOut(c.primfile.string(), fai, allp, pName, pSeq);
+  else if (c.format == "csv") primerCsvOut(c.primfile.string(), fai, allp, pName, pSeq);
+  else if (c.format == "jsoncsv") {
+    primerJsonOut(c.primfile.string() + ".json", fai, allp, pName, pSeq);
+    primerCsvOut(c.primfile.string() + ".csv", fai, allp, pName, pSeq);
+  }
+  primerTxtOut(c.primfile.string(), fai, allp, pName, pSeq);
 
   // Clean-up
   primer3thal::destroy_thal_structures();

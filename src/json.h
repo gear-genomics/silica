@@ -98,6 +98,52 @@ ampliconTxtOut(std::string const& outfile, faidx_t* fai, TPcrProducts const& pcr
 
 template<typename TPrimerBinds, typename TPrimerName, typename TPrimerSeq>
 inline void
+primerCsvOut(std::string const& outfile, faidx_t* fai, TPrimerBinds const& allp, TPrimerName const& pName, TPrimerSeq const& pSeq) {
+  std::ofstream forfile(outfile.c_str());
+  int32_t count = 0;
+  char sep = '\t';
+  forfile << "Number" << sep << "Primer Tm" << sep << "Location" << sep << "Strand";
+  forfile << "Primer Name" << sep << "Primer Sequence" << sep << "Genome Sequence" << std::endl;
+  for(typename TPrimerBinds::const_iterator it = allp.begin(); it != allp.end(); ++it, ++count) {
+    forfile << (count + 1) << sep << it->temp << sep << std::string(faidx_iseq(fai, it->refIndex)) << ":";
+    if (it->onFor) {
+      forfile << it->pos << "-" << (it->pos + pSeq[it->primerId].length()) << sep;
+      forfile << "forward" << sep;
+    } else {
+      forfile << (it->pos - pSeq[it->primerId].length()) << "-" <<  it->pos << sep;
+      forfile << "reverse" << sep;
+    }
+    forfile << pName[it->primerId] << sep << pSeq[it->primerId] << sep << it->genSeq << std::endl;
+  }
+  forfile.close();
+}
+
+template<typename TPcrProducts, typename TPrimerName, typename TPrimerSeq>
+inline void
+ampliconCsvOut(std::string const& outfile, faidx_t* fai, TPcrProducts const& pcrColl, TPrimerName const& pName, TPrimerSeq const& pSeq) {
+  std::ofstream rfile(outfile.c_str());
+  int32_t count = 0;
+  char sep = '\t';
+  rfile << "Number" << sep << "Length" << sep << "Penalty" << sep << "Location" << sep << "Forward Name" << sep;
+  rfile << "Forward Tm" << sep << "Forward Sequence" << sep << "Reverse Name" << sep;
+  rfile << "Reverse Tm" << sep << "Reverse Sequence" << sep << "Amplicon Sequence" << std::endl;
+  for(typename TPcrProducts::const_iterator it = pcrColl.begin(); it != pcrColl.end(); ++it, ++count) {
+    std::string chrom(faidx_iseq(fai, it->refIndex));
+    rfile << (count + 1) << sep << it->leng << sep << it->penalty << sep <<  chrom << ":";
+    rfile << it->forPos << "-" << it->revPos << sep << pName[it->forId] << sep << it->forTemp;
+    rfile << sep << pSeq[it->forId] << sep << pName[it->revId]  << sep << it->revTemp;
+    rfile << sep << pSeq[it->revId] << sep;
+    int32_t sl = -1;
+    char* seq = faidx_fetch_seq(fai, chrom.c_str(), it->forPos, it->revPos, &sl);
+    std::string seqstr = boost::to_upper_copy(std::string(seq));
+    rfile << seqstr << std::endl;
+    free(seq);
+  }
+  rfile.close();
+}
+
+template<typename TPrimerBinds, typename TPrimerName, typename TPrimerSeq>
+inline void
 primerJsonOut(std::string const& outfile, faidx_t* fai, TPrimerBinds const& allp, TPrimerName const& pName, TPrimerSeq const& pSeq) {
   std::ofstream forfile(outfile.c_str());
   int32_t count = 0;
