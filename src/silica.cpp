@@ -307,11 +307,13 @@ int main(int argc, char** argv) {
   // Query FM-Index
   now = boost::posix_time::second_clock::local_time();
   std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Query FM-Index" << std::endl;
+  boost::progress_display show_progress( pSeq.size() );
   typedef std::vector<PrimerBind> TPrimerBinds;
   typedef std::vector<TPrimerBinds> TChrPrimerBinds;
   TChrPrimerBinds forBind(faidx_nseq(fai), TPrimerBinds());
   TChrPrimerBinds revBind(faidx_nseq(fai), TPrimerBinds());
   for(uint32_t primerId = 0; primerId < pSeq.size(); ++primerId) {
+    ++show_progress;
     std::string qr = pSeq[primerId];
     if (qr.size() < c.kmer) continue;
     int32_t koffset = qr.size() - c.kmer;
