@@ -52,7 +52,7 @@ def results(uuid):
 
    if request.method == 'POST':
       if request.form['submit'] == 'Back to Submit Form':
-         return redirect(app.config['BASEURL'] + "../../upload", code=302)
+         return redirect(app.config['BASEURL'] + "/upload", code=302)
       prStart = int(onlyInt(request.form['prStart']))
       amStart = int(onlyInt(request.form['amStart']))
       if request.form['submit'] == 'Amp Up':
