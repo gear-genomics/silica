@@ -57,7 +57,6 @@ using namespace silica;
 
 struct Config {
   bool indel;
-  bool align;
   double cutTemp;
   uint32_t maxProdSize;
   double cutofPen;
@@ -182,7 +181,6 @@ int main(int argc, char** argv) {
   boost::program_options::options_description hidden("Hidden options");
   hidden.add_options()
     ("input-file", boost::program_options::value<boost::filesystem::path>(&c.infile), "seq.fasta")
-    ("align", "write alignments to stderr")
     ;
 
   boost::program_options::positional_options_description pos_args;
@@ -204,8 +202,6 @@ int main(int argc, char** argv) {
   }
 
   // Cmd switches
-  if (!vm.count("align")) c.align = false;
-  else c.align = true;
   if (!vm.count("hamming")) c.indel = true;
   else c.indel = false;
 
@@ -419,7 +415,7 @@ int main(int argc, char** argv) {
             }
                            
 	    // Debug alignment output
-	    //if (c.align) _debugAlignment(pSeq[primerId], genomicseq, fwdrev);
+	    //_debugAlignment(pSeq[primerId], genomicseq, fwdrev);
 	  }
 	}
       }
