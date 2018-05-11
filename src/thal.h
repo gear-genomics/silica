@@ -765,27 +765,22 @@ getTetraloop(struct tetraloop** tetraloopEntropies, struct tetraloop** tetraloop
 }
 
 static void 
-tableStartATS(double atp_value, double atpS[5][5])
-{
-
-   int i, j;
-   for (i = 0; i < 5; ++i)
-     for (j = 0; j < 5; ++j)
-       atpS[i][j] = 0.00000000001;
-     atpS[0][3] = atpS[3][0] = atp_value;
+tableStartATS(double atp_value, double atpS[5][5]) {
+  int i, j;
+  for (i = 0; i < 5; ++i)
+    for (j = 0; j < 5; ++j)
+      atpS[i][j] = 0.00000000001;
+  atpS[0][3] = atpS[3][0] = atp_value;
 }
 
 
 static void 
-tableStartATH(double atp_value, double atpH[5][5])
-{
-
-   int i, j;
-   for (i = 0; i < 5; ++i)
-     for (j = 0; j < 5; ++j)
-       atpH[i][j] = 0.0;
-
-     atpH[0][3] = atpH[3][0] = atp_value;
+tableStartATH(double atp_value, double atpH[5][5]) {
+  int i, j;
+  for (i = 0; i < 5; ++i)
+    for (j = 0; j < 5; ++j)
+      atpH[i][j] = 0.0;
+  atpH[0][3] = atpH[3][0] = atp_value;
 }
 
 static int 

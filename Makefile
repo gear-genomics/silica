@@ -1,6 +1,10 @@
 DEBUG ?= 0
 STATIC ?= 0
 
+prefix = /usr/local
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+
 # Submodules
 PWD = $(shell pwd)
 SDSL_ROOT ?= ${PWD}/src/sdslLite
@@ -35,6 +39,7 @@ BOOSTSOURCES = $(wildcard src/modular-boost/libs/iostreams/include/boost/iostrea
 PBASE=$(shell pwd)
 
 # Targets
+BUILT_PROGRAMS = src/silica
 TARGETS = .sdsl .htslib .boost src/silica
 
 all:   	$(TARGETS)
@@ -50,6 +55,10 @@ all:   	$(TARGETS)
 
 src/silica: .sdsl .htslib .boost ${IDXSOURCES}
 	$(CXX) $(CXXFLAGS) $@.cpp -o $@ $(LDFLAGS)
+
+install: ${BUILT_PROGRAMS}
+	mkdir -p ${bindir}
+	install -p ${BUILT_PROGRAMS} ${bindir}
 
 clean:
 	cd src/htslib && make clean
