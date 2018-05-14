@@ -58,7 +58,6 @@ using namespace silica;
 
 struct Config {
   bool indel;
-  bool amplicon;
   double cutTemp;
   uint32_t maxProdSize;
   double cutofPen;
@@ -151,7 +150,6 @@ int main(int argc, char** argv) {
     ("output,o", boost::program_options::value<boost::filesystem::path>(&c.outfile)->default_value("amplicons.txt"), "amplicon output file")
     ("primer,p", boost::program_options::value<boost::filesystem::path>(&c.primfile)->default_value("primers.txt"), "primer locations file")
     ("format,f", boost::program_options::value<std::string>(&c.format)->default_value("txt"), "output format (json, txt, csv or jsoncsv)")
-    ("noamplicon,q", "only output primer locations file")
     ;
 
   boost::program_options::options_description appr("Approximate Search Options");
@@ -207,10 +205,6 @@ int main(int argc, char** argv) {
   // Cmd switches
   if (!vm.count("hamming")) c.indel = true;
   else c.indel = false;
-
-  // Only primer locations
-  if (!vm.count("noamplicon")) c.amplicon = true;
-  else c.amplicon = false;
 
   // Set prefix and suffix based on edit distance
   c.pre_context = 2;
@@ -419,7 +413,7 @@ int main(int argc, char** argv) {
 		  addUnique(revBind[refIndex], prim, c.distance);
 		} else revBind[refIndex].push_back(prim);
               }
-            }
+	    }
                            
 	    // Debug alignment output
 	    //_debugAlignment(pSeq[primerId], genomicseq, fwdrev);
@@ -449,55 +443,53 @@ int main(int argc, char** argv) {
   }
   else primerTxtOut(c.primfile.string(), fai, allp, pName, pSeq);
 
-  if (c.amplicon) {
-    // Find PCR products
-    now = boost::posix_time::second_clock::local_time();
-    std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Find PCR Products" << std::endl;
-    boost::progress_display sp( faidx_nseq(fai) );
-    typedef std::vector<PcrProduct> TPcrProducts;
-    TPcrProducts pcrColl;
-    for(int32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
-      ++sp;
-      for(TPrimerBinds::iterator fw = forBind[refIndex].begin(); fw != forBind[refIndex].end(); ++fw) {
-	for(TPrimerBinds::iterator rv = revBind[refIndex].begin(); rv != revBind[refIndex].end(); ++rv) {
-	  if ((rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
-	    PcrProduct pcrProd;
-	    pcrProd.leng = rv->pos - fw->pos;
-	    pcrProd.refIndex = refIndex;
-	    pcrProd.forPos = fw->pos;
-	    pcrProd.forTemp = fw->temp;
-	    pcrProd.forId = fw->primerId;
-	    pcrProd.revPos = rv->pos;
-	    pcrProd.revTemp = rv->temp;
-	    pcrProd.revId = rv->primerId;
-	    // Calculate Penalty
-	    double pen = (fw->perfTemp - fw->temp) * c.penDiff;
-	    if (pen < 0) pen = 0;
-	    double bpen = (rv->perfTemp - rv->temp) * c.penDiff;
-	    if (bpen > 0) pen += bpen;
-	    pen += std::abs(fw->temp - rv->temp) * c.penMis;
-	    pen += pcrProd.leng * c.penLen;
-	    pcrProd.penalty = pen;
-	    if ((c.cutofPen < 0) || (pen < c.cutofPen)) pcrColl.push_back(pcrProd);
-	  }
+  // Find PCR products
+  now = boost::posix_time::second_clock::local_time();
+  std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Find PCR Products" << std::endl;
+  boost::progress_display sp( faidx_nseq(fai) );
+  typedef std::vector<PcrProduct> TPcrProducts;
+  TPcrProducts pcrColl;
+  for(int32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
+    ++sp;
+    for(TPrimerBinds::iterator fw = forBind[refIndex].begin(); fw != forBind[refIndex].end(); ++fw) {
+      for(TPrimerBinds::iterator rv = revBind[refIndex].begin(); rv != revBind[refIndex].end(); ++rv) {
+	if ((rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
+	  PcrProduct pcrProd;
+	  pcrProd.leng = rv->pos - fw->pos;
+	  pcrProd.refIndex = refIndex;
+	  pcrProd.forPos = fw->pos;
+	  pcrProd.forTemp = fw->temp;
+	  pcrProd.forId = fw->primerId;
+	  pcrProd.revPos = rv->pos;
+	  pcrProd.revTemp = rv->temp;
+	  pcrProd.revId = rv->primerId;
+	  // Calculate Penalty
+	  double pen = (fw->perfTemp - fw->temp) * c.penDiff;
+	  if (pen < 0) pen = 0;
+	  double bpen = (rv->perfTemp - rv->temp) * c.penDiff;
+	  if (bpen > 0) pen += bpen;
+	  pen += std::abs(fw->temp - rv->temp) * c.penMis;
+	  pen += pcrProd.leng * c.penLen;
+	  pcrProd.penalty = pen;
+	  if ((c.cutofPen < 0) || (pen < c.cutofPen)) pcrColl.push_back(pcrProd);
 	}
       }
     }
-    
-    // Sort by penalty
-    std::sort(pcrColl.begin(), pcrColl.end(), SortProducts<PcrProduct>());
-    
-    // Output amplicons
-    now = boost::posix_time::second_clock::local_time();
-    std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Output Amplicons" << std::endl;
-    if (c.format == "json") ampliconJsonOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
-    else if (c.format == "csv") ampliconCsvOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
-    else if (c.format == "jsoncsv") {
-      ampliconJsonOut(c.outfile.string() + ".json", fai, pcrColl, pName, pSeq);
-      ampliconCsvOut(c.outfile.string() + ".csv", fai, pcrColl, pName, pSeq);
-    }
-    else ampliconTxtOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
   }
+    
+  // Sort by penalty
+  std::sort(pcrColl.begin(), pcrColl.end(), SortProducts<PcrProduct>());
+  
+  // Output amplicons
+  now = boost::posix_time::second_clock::local_time();
+  std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Output Amplicons" << std::endl;
+  if (c.format == "json") ampliconJsonOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
+  else if (c.format == "csv") ampliconCsvOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
+  else if (c.format == "jsoncsv") {
+    ampliconJsonOut(c.outfile.string() + ".json", fai, pcrColl, pName, pSeq);
+    ampliconCsvOut(c.outfile.string() + ".csv", fai, pcrColl, pName, pSeq);
+  }
+  else ampliconTxtOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
 
   // Clean-up
   primer3thal::destroy_thal_structures();
