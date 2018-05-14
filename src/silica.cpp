@@ -27,6 +27,7 @@ Contact: Tobias Rausch (rausch@embl.de)
 #include <vector>
 
 #define BOOST_DISABLE_ASSERTS
+#include <boost/dll.hpp>
 #include <boost/multi_array.hpp>
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
@@ -133,7 +134,7 @@ int main(int argc, char** argv) {
   Config c;
 
   // Initialize thal arguments
-  boost::filesystem::path exepath = boost::filesystem::system_complete(argv[0]).parent_path().branch_path();
+  boost::filesystem::path exepath = boost::dll::program_location().parent_path().branch_path();
   std::string cfgpath = exepath.string() + "/src/primer3_config/";
   primer3thal::thal_args a;
   primer3thal::set_thal_default_args(&a);

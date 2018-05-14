@@ -1,5 +1,6 @@
 .sdsl
 .htslib
+bin/
 src/silica
 src/sdslLite/
 fm/
