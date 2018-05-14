@@ -10,6 +10,11 @@ PWD = $(shell pwd)
 SDSL_ROOT ?= ${PWD}/src/sdslLite
 EBROOTHTSLIB ?= ${PWD}/src/htslib/
 
+# Install dir
+prefix = ${PWD}
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+
 # Flags
 CXX=g++
 CXXFLAGS += -std=c++11 -O3 -DNDEBUG -isystem ${EBROOTHTSLIB} -isystem ${SDSL_ROOT}/include -pedantic -W -Wall
