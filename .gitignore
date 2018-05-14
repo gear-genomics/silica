@@ -1,6 +1,5 @@
 .sdsl
 .htslib
-.boost
 src/silica
 src/sdslLite/
 fm/

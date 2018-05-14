@@ -3,7 +3,7 @@ In-silico PCR on complete genomes.
 Installing
 ----------
 
-`sudo apt-get install -y build-essential g++ cmake git-all liblzma-dev zlib1g-dev libbz2-dev liblzma-dev`
+`sudo apt-get install -y build-essential g++ cmake git-all liblzma-dev zlib1g-dev libbz2-dev liblzma-dev libboost-date-time-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libboost-iostreams-dev`
 
 `git clone --recursive https://github.com/gear-genomics/silica.git`
 
