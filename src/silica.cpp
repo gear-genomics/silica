@@ -58,6 +58,7 @@ using namespace silica;
 
 struct Config {
   bool indel;
+  bool pruneprimer;
   double cutTemp;
   uint32_t maxProdSize;
   double cutofPen;
@@ -156,6 +157,7 @@ int main(int argc, char** argv) {
   appr.add_options()
     ("kmer,k", boost::program_options::value<uint32_t>(&c.kmer)->default_value(15), "k-mer size")
     ("maxmatches,m", boost::program_options::value<std::size_t>(&c.max_locations)->default_value(10000), "max. number of matches per k-mer")
+    ("pruneprimer,q", "prune primers with more than maxmatches") 
     ("distance,d", boost::program_options::value<uint32_t>(&c.distance)->default_value(1), "neighborhood distance")
     ("hamming,n", "use hamming neighborhood instead of edit distance")
     ;
@@ -205,6 +207,8 @@ int main(int argc, char** argv) {
   // Cmd switches
   if (!vm.count("hamming")) c.indel = true;
   else c.indel = false;
+  if (vm.count("pruneprimer")) c.pruneprimer = true;
+  else c.pruneprimer = false;
 
   // Set prefix and suffix based on edit distance
   c.pre_context = 2;
@@ -279,9 +283,22 @@ int main(int argc, char** argv) {
     while(std::getline(fafile, line)) {
       if (!line.empty()) {
 	if (line[0] == '>') {
-	  if ((!fan.empty()) && (!tmpfasta.empty())) {
-	    pName.push_back(fan);
-	    pSeq.push_back(tmpfasta);
+	  if ((!fan.empty()) && (!tmpfasta.empty()) && (tmpfasta.size() > c.kmer)) {
+	    if (c.pruneprimer) {
+	      std::string qr = tmpfasta.substr(tmpfasta.size() - c.kmer);
+	      std::size_t occs = sdsl::count(fm_index, qr.begin(), qr.end());
+	      if (occs <= c.max_locations) {
+		reverseComplement(qr);
+		occs = sdsl::count(fm_index, qr.begin(), qr.end());
+		if (occs <= c.max_locations) {
+		  pName.push_back(fan);
+		  pSeq.push_back(tmpfasta);
+		}
+	      }
+	    } else {
+	      pName.push_back(fan);
+	      pSeq.push_back(tmpfasta);
+	    }
 	    tmpfasta = "";
 	  }
 	  fan = line.substr(1);
@@ -290,9 +307,22 @@ int main(int argc, char** argv) {
 	}
       }
     }
-    if ((!fan.empty()) && (!tmpfasta.empty())) {
-      pName.push_back(fan);
-      pSeq.push_back(tmpfasta);
+    if ((!fan.empty()) && (!tmpfasta.empty()) && (tmpfasta.size() > c.kmer)) {
+      if (c.pruneprimer) {
+	std::string qr = tmpfasta.substr(tmpfasta.size() - c.kmer);
+	std::size_t occs = sdsl::count(fm_index, qr.begin(), qr.end());
+	if (occs <= c.max_locations) {
+	  reverseComplement(qr);
+	  occs = sdsl::count(fm_index, qr.begin(), qr.end());
+	  if (occs <= c.max_locations) {
+	    pName.push_back(fan);
+	    pSeq.push_back(tmpfasta);
+	  }
+	}
+      } else {
+	pName.push_back(fan);
+	pSeq.push_back(tmpfasta);
+      }
     }
   }
 
@@ -443,54 +473,56 @@ int main(int argc, char** argv) {
   }
   else primerTxtOut(c.primfile.string(), fai, allp, pName, pSeq);
 
-  // Find PCR products
-  now = boost::posix_time::second_clock::local_time();
-  std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Find PCR Products" << std::endl;
-  boost::progress_display sp( faidx_nseq(fai) );
-  typedef std::vector<PcrProduct> TPcrProducts;
-  TPcrProducts pcrColl;
-  for(int32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
-    ++sp;
-    for(TPrimerBinds::iterator fw = forBind[refIndex].begin(); fw != forBind[refIndex].end(); ++fw) {
-      for(TPrimerBinds::iterator rv = revBind[refIndex].begin(); rv != revBind[refIndex].end(); ++rv) {
-	if ((rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
-	  PcrProduct pcrProd;
-	  pcrProd.leng = rv->pos - fw->pos;
-	  pcrProd.refIndex = refIndex;
-	  pcrProd.forPos = fw->pos;
-	  pcrProd.forTemp = fw->temp;
-	  pcrProd.forId = fw->primerId;
-	  pcrProd.revPos = rv->pos;
-	  pcrProd.revTemp = rv->temp;
-	  pcrProd.revId = rv->primerId;
-	  // Calculate Penalty
-	  double pen = (fw->perfTemp - fw->temp) * c.penDiff;
-	  if (pen < 0) pen = 0;
-	  double bpen = (rv->perfTemp - rv->temp) * c.penDiff;
-	  if (bpen > 0) pen += bpen;
-	  pen += std::abs(fw->temp - rv->temp) * c.penMis;
-	  pen += pcrProd.leng * c.penLen;
-	  pcrProd.penalty = pen;
-	  if ((c.cutofPen < 0) || (pen < c.cutofPen)) pcrColl.push_back(pcrProd);
+  if (!c.pruneprimer) {
+    // Find PCR products
+    now = boost::posix_time::second_clock::local_time();
+    std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Find PCR Products" << std::endl;
+    boost::progress_display sp( faidx_nseq(fai) );
+    typedef std::vector<PcrProduct> TPcrProducts;
+    TPcrProducts pcrColl;
+    for(int32_t refIndex = 0; refIndex < faidx_nseq(fai); ++refIndex) {
+      ++sp;
+      for(TPrimerBinds::iterator fw = forBind[refIndex].begin(); fw != forBind[refIndex].end(); ++fw) {
+	for(TPrimerBinds::iterator rv = revBind[refIndex].begin(); rv != revBind[refIndex].end(); ++rv) {
+	  if ((rv->pos > fw->pos) && (rv->pos - fw->pos < c.maxProdSize)) {
+	    PcrProduct pcrProd;
+	    pcrProd.leng = rv->pos - fw->pos;
+	    pcrProd.refIndex = refIndex;
+	    pcrProd.forPos = fw->pos;
+	    pcrProd.forTemp = fw->temp;
+	    pcrProd.forId = fw->primerId;
+	    pcrProd.revPos = rv->pos;
+	    pcrProd.revTemp = rv->temp;
+	    pcrProd.revId = rv->primerId;
+	    // Calculate Penalty
+	    double pen = (fw->perfTemp - fw->temp) * c.penDiff;
+	    if (pen < 0) pen = 0;
+	    double bpen = (rv->perfTemp - rv->temp) * c.penDiff;
+	    if (bpen > 0) pen += bpen;
+	    pen += std::abs(fw->temp - rv->temp) * c.penMis;
+	    pen += pcrProd.leng * c.penLen;
+	    pcrProd.penalty = pen;
+	    if ((c.cutofPen < 0) || (pen < c.cutofPen)) pcrColl.push_back(pcrProd);
+	}
 	}
       }
     }
+    
+    // Sort by penalty
+    std::sort(pcrColl.begin(), pcrColl.end(), SortProducts<PcrProduct>());
+    
+    // Output amplicons
+    now = boost::posix_time::second_clock::local_time();
+    std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Output Amplicons" << std::endl;
+    if (c.format == "json") ampliconJsonOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
+    else if (c.format == "csv") ampliconCsvOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
+    else if (c.format == "jsoncsv") {
+      ampliconJsonOut(c.outfile.string() + ".json", fai, pcrColl, pName, pSeq);
+      ampliconCsvOut(c.outfile.string() + ".csv", fai, pcrColl, pName, pSeq);
+    }
+    else ampliconTxtOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
   }
     
-  // Sort by penalty
-  std::sort(pcrColl.begin(), pcrColl.end(), SortProducts<PcrProduct>());
-  
-  // Output amplicons
-  now = boost::posix_time::second_clock::local_time();
-  std::cout << '[' << boost::posix_time::to_simple_string(now) << "] " << "Output Amplicons" << std::endl;
-  if (c.format == "json") ampliconJsonOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
-  else if (c.format == "csv") ampliconCsvOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
-  else if (c.format == "jsoncsv") {
-    ampliconJsonOut(c.outfile.string() + ".json", fai, pcrColl, pName, pSeq);
-    ampliconCsvOut(c.outfile.string() + ".csv", fai, pcrColl, pName, pSeq);
-  }
-  else ampliconTxtOut(c.outfile.string(), fai, pcrColl, pName, pSeq);
-
   // Clean-up
   primer3thal::destroy_thal_structures();
   if (fai != NULL) fai_destroy(fai);
