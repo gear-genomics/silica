@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="static/css/silica.css">
 </head>
 
-<body onload="checkPath()">
+<body onload="checkPath();buildGenomeIndexButton()">
 
   <header class="px-0 py-4">
     <div class="container">
@@ -59,28 +59,22 @@
               or upload Fasta file (.fa)<br>
             <input type="file" class="btn btn-default btn-file" name="fasta" id="fasta" />
           </div>
-          <input class="span2" id="genome" name="genome" type="hidden">
-          <div class="alert alert-primary mb-2" role="alert">
-              and select genome
-            <br />
-	    <p></p>
-            <div class="dropdown">
-              <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" id="btn-genome" name="btn-genome">
-                Genome
-              </button>
-              <div class="dropdown-menu">
-                <a class="dropdown-item" href="#" onclick="$('#genome').val('Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz')">A. thaliana TAIR10</a>
-                <a class="dropdown-item" href="#" onclick="$('#genome').val('Caenorhabditis_elegans.WBcel235.dna.toplevel.fa.gz')">C. elegans WBcel235</a>
-                <a class="dropdown-item" href="#" onclick="$('#genome').val('Danio_rerio.GRCz10.dna.toplevel.fa.gz')">Danio Rerio GRCz10</a>
-                <a class="dropdown-item" href="#" onclick="$('#genome').val('Drosophila_melanogaster.BDGP6.dna.toplevel.fa.gz')">D. melanogaster BDGP6</a>
-                <a class="dropdown-item" href="#" onclick="$('#genome').val('Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz')">Homo Sapiens GRCh37</a>
-                <a class="dropdown-item" href="#" onclick="$('#genome').val('Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz')">Homo Sapiens GRCh38</a>
-                <a class="dropdown-item" href="#" onclick="$('#genome').val('Oryzias_latipes.MEDAKA1.dna.toplevel.fa.gz')">Medaka1</a>
-                <a class="dropdown-item" href="#" onclick="$('#genome').val('Mus_musculus.GRCm38.dna.primary_assembly.fa.gz')">Mus musculus GRCm38</a>
-                <a class="dropdown-item" href="#" onclick="$('#genome').val('Saccharomyces_cerevisiae.R64-1-1.dna.toplevel.fa.gz')">S. cerevisiae R64</a>
+          <div id="genomeIndexSel">
+            <input class="span2" id="genome" name="genome" type="hidden">
+            <div class="alert alert-primary mb-2" role="alert">
+                and select genome
+              <br />
+	      <p></p>
+              <div class="dropdown">
+                <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" id="btn-genome" name="btn-genome">
+                  Genome
+                </button>
+                <div class="dropdown-menu">
+                  <a class="dropdown-item" href="#">Genomes not loaded!</a>
+                </div>
               </div>
             </div>
-          </div>
+	  </div>
           <br />
           <div class="form-group">
             <label for="setAmpSize">Maximum Size of PCR Product (bp)</label>
@@ -232,7 +226,7 @@
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
 
   <script src="static/js/silica.js"></script>
-
+  <script src="static/js/genomeIndexSel.js"></script>
 </body>
 
 </html>

@@ -126,7 +126,6 @@ function displayData(data) {
 }
 
 function displayError(data) {
-    alert(data)
     var res = JSON.parse(data)
     for (var i = 0; i < res["errors"].length; i++) {
         sectionResults.innerHTML = '<br /><div class="error">' + res["errors"][i]['title'] + '</div><br />'

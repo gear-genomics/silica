@@ -206,6 +206,10 @@ def results(uuid):
 def link(uuid):
     return send_from_directory(os.path.join(SILICAWS, "../client"),"index.html"), 200
 
+@app.route('/genomeindex')
+def genomeind():
+    return send_from_directory(os.path.join(SILICAWS, "../fm"),"genomeindexindex.json"), 200
+
 @app.route('/')
 def root():
     return send_from_directory(os.path.join(SILICAWS, "../client"),"index.html"), 200
