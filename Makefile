@@ -1,10 +1,6 @@
 DEBUG ?= 0
 STATIC ?= 0
 
-prefix = /usr/local
-exec_prefix = $(prefix)
-bindir = $(exec_prefix)/bin
-
 # Submodules
 PWD = $(shell pwd)
 SDSL_ROOT ?= ${PWD}/src/sdslLite
