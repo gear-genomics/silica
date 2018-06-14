@@ -1,0 +1,17 @@
+.tab-content {
+  padding-top: 10px;
+}
+
+.tab-content pre {
+  white-space: pre-line;
+  padding: 10px;
+}
+
+#chart {
+  margin-top: 20px;
+}
+
+.error {
+  font-weight: bold;
+  color: red;
+}
