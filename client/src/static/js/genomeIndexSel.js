@@ -10,7 +10,7 @@ function buildGenomeIndexButton() {
     }
     var req = new XMLHttpRequest()
     req.addEventListener('load', bgiResults)
-    req.open('GET', loca + '/genomeindex', true)
+    req.open('GET', loca + '/api/v1/genomeindex', true)
     req.send()
 }
 

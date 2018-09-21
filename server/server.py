@@ -19,7 +19,7 @@ app.config['SILICA'] = os.path.join(SILICAWS, "..")
 app.config['UPLOAD_FOLDER'] = os.path.join(app.config['SILICA'], "data")
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024   #maximum of 8MB
 app.config['BASEURL'] = '/silica'
-app.static_folder = app.static_url_path = os.path.join(SILICAWS, "../client/static")
+app.static_folder = app.static_url_path = os.path.join(SILICAWS, "../client/src/static")
 
 def allowed_file(filename):
    return '.' in filename and filename.rsplit('.', 1)[1].lower() in set(['fasta', 'fa', 'json', 'csv', 'txt'])
@@ -28,7 +28,7 @@ uuid_re = re.compile(r'(^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 def is_valid_uuid(s):
    return uuid_re.match(s) is not None
 
-@app.route('/download/<uuid>')
+@app.route('/api/v1/download/<uuid>')
 def download(uuid):
    if is_valid_uuid(uuid):
       ma = uuid_re.match(uuid)
@@ -56,7 +56,7 @@ def download(uuid):
    return "File does not exist!"
 
 
-@app.route('/upload', methods=['POST'])
+@app.route('/api/v1/upload', methods=['POST'])
 def generate():
     uuidstr = str(uuid.uuid4())
 
@@ -172,7 +172,7 @@ def generate():
     return jsonify(data = json.loads(alldata)), 200
 
 
-@app.route('/results/<uuid>', methods = ['GET', 'POST'])
+@app.route('/api/v1/results/<uuid>', methods = ['GET', 'POST'])
 def results(uuid):
     if is_valid_uuid(uuid):
         sf = os.path.join(app.config['UPLOAD_FOLDER'], uuid[0:2])
@@ -202,17 +202,13 @@ def results(uuid):
                             return jsonify(data = json.loads(alldata)), 200
     return jsonify(errors = [{"title": "Link outdated or invalid!"}]), 400
 
-@app.route('/<uuid>')
+@app.route('/api/v1/<uuid>')
 def link(uuid):
-    return send_from_directory(os.path.join(SILICAWS, "../client"),"index.html"), 200
+    return send_from_directory(os.path.join(SILICAWS, "../client/src"),"index.html"), 200
 
-@app.route('/genomeindex')
+@app.route('/api/v1/genomeindex')
 def genomeind():
     return send_from_directory(os.path.join(SILICAWS, "../fm"),"genomeindexindex.json"), 200
-
-@app.route('/')
-def root():
-    return send_from_directory(os.path.join(SILICAWS, "../client"),"index.html"), 200
 
 def onlyFloat(txt):
     onlyNumbDC = re.compile('[^0-9,.\-]')

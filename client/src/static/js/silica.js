@@ -93,7 +93,7 @@ function loadLink (uuid) {
     }
     var req = new XMLHttpRequest()
     req.addEventListener('load', displayResults)
-    req.open('GET', loca + '/results' + uuid, true)
+    req.open('GET', loca + '/api/v1/results' + uuid, true)
     req.send()
     sectionResults.innerHTML = spinnerHtml
 }
@@ -106,7 +106,7 @@ function doSubmit (data) {
     }
     var req = new XMLHttpRequest()
     req.addEventListener('load', displayResults)
-    req.open('POST', loca + '/upload', true)
+    req.open('POST', loca + '/api/v1/upload', true)
     req.send(data)
     sectionResults.innerHTML = spinnerHtml
 }
