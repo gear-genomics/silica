@@ -1,44 +1,42 @@
-/* global XMLHttpRequest */
+const API_URL = process.env.API_URL
 
-var genBtn = document.getElementById('genomeIndexSel')
-genBtn.addEventListener('load', buildGenomeIndexButton)
+const targetGenomes = document.getElementById('target-genome')
 
-function buildGenomeIndexButton() {
-    var loca = 'http://0.0.0.0:3300';
-    if (location.origin.startsWith("http")) {
-        loca = location.origin;
+document.addEventListener("DOMContentLoaded", function() {
+  // Send different data to avoid caching
+  var dt = new Date();
+  var utcDate = dt.toUTCString();
+  const formData = new FormData()
+  formData.append('stufferData', formData)
+  axios
+    .post(`${API_URL}/genomeindex`, formData)
+    .then(res => {
+	if (res.status === 200) {
+          handleSuccess(res.data)
+      }
+    })
+    .catch(err => {
+      let errorMessage = err
+      if (err.response) {
+        errorMessage = err.response.data.errors
+          .map(error => error.title)
+          .join('; ')
+      }
+      alert("Error loading genomeindex-index: " + errorMessage);
+    })
+});
+
+async function handleSuccess(res) {
+  var rhtml = '<select class="form-control" id="genome-select">\n'
+  for (var i = 0; i < res.length; i++) {
+    rhtml += '  <option value="' + res[i].file + '"'
+    if (res[i].preselect == true) {
+      rhtml += ' selected'
     }
-    var req = new XMLHttpRequest()
-    req.addEventListener('load', bgiResults)
-    req.open('GET', loca + '/api/v1/genomeindex', true)
-    req.send()
+    rhtml += '>' + res[i].name + '</option>\n'
+  }
+  rhtml += '</select>\n'
+  targetGenomes.innerHTML = rhtml
 }
-
-function bgiResults() {
-    if (this.status === 200) {
-        bgiProcess(this.response)
-    } else {
-        alert("Fatal error loading genome index!") 
-    }
-}
-
-function bgiProcess(data) {
-    var res = JSON.parse(data)
-    var rhtml = '<input class="span2" id="genome" name="genome" type="hidden">\n<div class="alert alert-primary mb-2" role="alert">\n'
-    rhtml += 'and select genome\n<br />\n<p></p>\n<div class="dropdown">\n'
-    rhtml += '<button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true"'
-    rhtml += ' aria-expanded="false" id="btn-genome" name="btn-genome">\nGenome\n</button>\n<div class="dropdown-menu">'
-    for (var i = 0; i < res.length; i++) {
-        rhtml += '<a class="dropdown-item" href="#" onclick="bgiUp(\'' + res[i].name + '\',\'' + res[i].file + '\')">' + res[i].name + '</a>'
-    }
-    rhtml += '</div>\n</div>\n</div>\n</div>\n'
-    genBtn.innerHTML = rhtml
-}
-
-function bgiUp(gname,gfile) {
-    document.getElementById('genome').value = gfile;
-    document.getElementById('btn-genome').innerHTML = gname;
-}
-
 
 

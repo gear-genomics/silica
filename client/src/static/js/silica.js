@@ -1,4 +1,5 @@
-/* global XMLHttpRequest */
+const API_URL = process.env.API_URL
+const API_LINK = process.env.API_LINK
 
 var res = ""
 var prStart = 0
@@ -8,17 +9,34 @@ var step = 30
 var fileLoad = document.getElementById('fasta');
 fileLoad.addEventListener('change', loadFasta, false);
 var submitButton = document.getElementById('btn-submit')
-submitButton.addEventListener('click', submit)
+submitButton.addEventListener('click', run)
 var sampleButton = document.getElementById('btn-example')
 sampleButton.addEventListener('click', sampleData)
 var helpButton = document.getElementById('btn-help')
 helpButton.addEventListener('click', goToHelp)
+
+
 const resultLink = document.getElementById('link-results')
 const helpLink = document.getElementById('link-help')
+const resultInfo = document.getElementById('result-info')
+const resultError = document.getElementById('result-error')
+const resultTabs = document.getElementById('result-tabs')
 const primerLink = document.getElementById('link-primers')
+const targetGenomes = document.getElementById('target-genome')
 var sectionResults = document.getElementById('results')
-var sectionAmplicons = document.getElementById('res-amplicons')
-var sectionPrimers = document.getElementById('res-primers')
+var sectionAmpliconLink = document.getElementById('res-amplicons-link')
+var sectionAmpliconData = document.getElementById('res-amplicons-data')
+var sectionPrimerLink = document.getElementById('res-primers-link')
+var sectionPrimerData = document.getElementById('res-primers-data')
+
+var btnAmpUp = document.getElementById('res-amplicons-Up')
+btnAmpUp.addEventListener('click', ampUp)
+var btnAmpDown = document.getElementById('res-amplicons-Down')
+btnAmpDown.addEventListener('click', ampDown)
+var btnPrimerUp = document.getElementById('res-primers-Up')
+btnPrimerUp.addEventListener('click', primerUp)
+var btnPrimerDown = document.getElementById('res-primers-Down')
+btnPrimerDown.addEventListener('click', primerDown)
 
 $('#mainTab a').on('click', function (e) {
   e.preventDefault()
@@ -32,12 +50,13 @@ $('#resTab a').on('click', function (e) {
 
 var spinnerHtml = '<p>Analysis takes a couple of seconds to run, please be patient.</p><i class="fa fa-spinner fa-pulse fa-3x fa-fw"></i><br /><br />'
 
-function checkPath(){
+document.addEventListener("DOMContentLoaded", function() {
     var path = window.location.pathname
-    if (path != "/") {
-        loadLink (path)
+    var uuid = path.substring(path.indexOf("/")+1)
+    if (uuid != "") {
+        loadLink(uuid)
     }
-}
+});
 
 function goToHelp() {
     helpLink.click();
@@ -62,76 +81,102 @@ function loadFasta(f) {
 function sampleData () {
     var fasta = document.getElementById('fastaText')
     fasta.value = '>FGA_f\nGCCCCATAGGTTTTGAACTCA\n>FGA_r\nTGATTTGTCTGTAATTGCCAGC\n';
-    document.getElementById('genome').value = 'Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz';
-    document.getElementById('btn-genome').innerHTML = 'Homo Sapiens GRCh37';
-}
-
-function submit () {
-    var data = new FormData();
-    data.append('fastaText', document.getElementById('fastaText').value);
-    data.append('genome', document.getElementById('genome').value);
-    data.append('setAmpSize', document.getElementById('setAmpSize').value);
-    data.append('setTmCutoff', document.getElementById('setTmCutoff').value);
-    data.append('setKmer', document.getElementById('setKmer').value);
-    data.append('setDist', document.getElementById('setDist').value);
-    data.append('setCutoffPen', document.getElementById('setCutoffPen').value);
-    data.append('setPenTmDiff', document.getElementById('setPenTmDiff').value);
-    data.append('setPenTmMismatch', document.getElementById('setPenTmMismatch').value);
-    data.append('setPenLength', document.getElementById('setPenLength').value);
-    data.append('setCtmMv', document.getElementById('setCtmMv').value);
-    data.append('setCtmDv', document.getElementById('setCtmDv').value);
-    data.append('setCtmDNA', document.getElementById('setCtmDNA').value);
-    data.append('setCtmDNTP', document.getElementById('setCtmDNTP').value);
-    doSubmit (data);
-}
-
-function loadLink (uuid) {
-    resultLink.click();
-    var loca = 'http://0.0.0.0:3300';
-    if (location.origin.startsWith("http")) {
-        loca = location.origin;
+    var selectbox = document.getElementById('genome-select')
+    for (var i = 0 ; i < selectbox.options.length ; i++) {
+        if (selectbox.options[i].value == 'Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz') {
+            selectbox.selectedIndex = i;
+        }
     }
-    var req = new XMLHttpRequest()
-    req.addEventListener('load', displayResults)
-    req.open('GET', loca + '/api/v1/results' + uuid, true)
-    req.send()
-    sectionResults.innerHTML = spinnerHtml
 }
 
-function doSubmit (data) {
-    resultLink.click();
-    var loca = 'http://0.0.0.0:3300';
-    if (location.origin.startsWith("http")) {
-        loca = location.origin;
-    }
-    var req = new XMLHttpRequest()
-    req.addEventListener('load', displayResults)
-    req.open('POST', loca + '/api/v1/upload', true)
-    req.send(data)
-    sectionResults.innerHTML = spinnerHtml
+// TODO client-side validation
+function run() {
+    resultLink.click()
+    const formData = new FormData()
+    formData.append('fastaText', document.getElementById('fastaText').value);
+    const genome = targetGenomes.querySelector('option:checked').value
+    formData.append('genome', genome)
+    formData.append('setAmpSize', document.getElementById('setAmpSize').value);
+    formData.append('setTmCutoff', document.getElementById('setTmCutoff').value);
+    formData.append('setKmer', document.getElementById('setKmer').value);
+    formData.append('setDist', document.getElementById('setDist').value);
+    formData.append('setCutoffPen', document.getElementById('setCutoffPen').value);
+    formData.append('setPenTmDiff', document.getElementById('setPenTmDiff').value);
+    formData.append('setPenTmMismatch', document.getElementById('setPenTmMismatch').value);
+    formData.append('setPenLength', document.getElementById('setPenLength').value);
+    formData.append('setCtmMv', document.getElementById('setCtmMv').value);
+    formData.append('setCtmDv', document.getElementById('setCtmDv').value);
+    formData.append('setCtmDNA', document.getElementById('setCtmDNA').value);
+    formData.append('setCtmDNTP', document.getElementById('setCtmDNTP').value);
+
+    hideElement(resultError)
+    showElement(resultInfo)
+    hideElement(resultTabs)
+    hideElement(sectionResults)
+
+    axios
+        .post(`${API_URL}/upload`, formData)
+        .then(res => {
+            if (res.status === 200) {
+                handleSuccess(res.data)
+            }
+        })
+        .catch(err => {
+            let errorMessage = err
+            if (err.response) {
+                errorMessage = err.response.data.errors
+                .map(error => error.title)
+                .join('; ')
+            }
+            hideElement(resultInfo)
+            showElement(resultError)
+            resultError.querySelector('#error-message').textContent = errorMessage
+        })
 }
 
-function displayResults() {
-    if (this.status === 200) {
-        displayData(this.response)
-    } else {
-        displayError(this.response)
-    }
-    resultLink.click();
-}
-
-function displayData(data) {
-    res = JSON.parse(data)
+async function handleSuccess(data) {
+    hideElement(resultInfo)
+    hideElement(resultError)
+    showElement(resultTabs)
+    showElement(sectionResults)
+    res = data
     updateResults()
 }
 
-function displayError(data) {
-    var res = JSON.parse(data)
-    for (var i = 0; i < res["errors"].length; i++) {
-        sectionResults.innerHTML = '<br /><div class="error">' + res["errors"][i]['title'] + '</div><br />'
-    }
-    sectionAmplicons.innerHTML = '<br />'
-    sectionPrimers.innerHTML = '<br />'
+function showElement(element) {
+  element.classList.remove('d-none')
+}
+
+function hideElement(element) {
+  element.classList.add('d-none')
+}
+
+function loadLink (uuid) {
+    resultLink.click()
+
+    hideElement(resultError)
+    showElement(resultInfo)
+    hideElement(resultTabs)
+    hideElement(sectionResults)
+
+    axios
+        .get(`${API_URL}/results/` + uuid)
+        .then(res => {
+            if (res.status === 200) {
+                handleSuccess(res.data)
+            }
+        })
+        .catch(err => {
+            let errorMessage = err
+            if (err.response) {
+                errorMessage = err.response.data.errors
+                .map(error => error.title)
+                .join('; ')
+            }
+            hideElement(resultInfo)
+            showElement(resultError)
+            resultError.querySelector('#error-message').textContent = errorMessage
+        })
 }
 
 function updateResults() {
@@ -149,15 +194,21 @@ function updateResults() {
         rHTML += '<div class="alert alert-warning" role="alert"><strong>No Primer Binding Sites Found!</strong></div>\n'
     }
     else {
-        rHTML += '<div class="alert alert-success" role="alert"><strong> ' + primecount + ' Primer Binding Sites Found!</strong></div>\n'
+        rHTML += '<p>Link to this result page:<br />\n'
+        rHTML += '<a href="' + `${API_LINK}` + res.data.uuid + '">' + `${API_LINK}` + res.data.uuid + '</a></p>\n'
     }
+    rHTML += '<div class="alert alert-success" role="alert"><strong> ' + primecount + ' Primer Binding Sites Found!</strong></div>\n'
     sectionResults.innerHTML = '<br />' + rHTML + '<br />'
     rHTML = ""
     if (ampcount > 0) {
-        rHTML += '<p>Download all as <a href="/silica/download' + res.data.link + '-ac">CSV</a>'
-        rHTML += ' or <a href="/silica/download/' + res.data.link + '-aj">JSON</a></p>'
+        rHTML += '<p>Download all as <a href="' + `${API_URL}/download/` + res.data.uuid + '-ac" download>CSV</a>'
+        rHTML += ' or <a href="' + `${API_URL}/download/` + res.data.uuid + '-aj" download>JSON</a></p>'
+        sectionAmpliconLink.innerHTML = rHTML
+        rHTML = ""
         if (amStart != 0) {
-            rHTML += '<button type="button" class="btn btn-secondary" onclick="ampUp()">Up</button>'
+            showElement(btnAmpUp)
+        } else {
+            hideElement(btnAmpUp)
         }
         var amStop = amStart + step
         var moreAmp = 1
@@ -189,16 +240,24 @@ function updateResults() {
             rHTML += '</p>'
 	}
         if (moreAmp == 1) {
-            rHTML += '<button type="button" class="btn btn-secondary" onclick="ampDown()">Down</button>'
+            showElement(btnAmpDown)
+        } else {
+            hideElement(btnAmpDown)
         }
+    } else {
+        sectionAmpliconLink.innerHTML = ""
     }
-    sectionAmplicons.innerHTML = '<br />' + rHTML + '<br />'
+    sectionAmpliconData.innerHTML = rHTML
     rHTML = ""
     if (primecount > 0) {
-        rHTML += '<p>Download all as <a href="/silica/download' + res.data.link + '-pc">CSV</a>'
-        rHTML += ' or <a href="/silica/download/' + res.data.link + '-pj">JSON</a></p>'
+        rHTML += '<p>Download all as <a href="' + `${API_URL}/download/` + res.data.uuid + '-pc" download>CSV</a>'
+        rHTML += ' or <a href="' + `${API_URL}/download/` + res.data.uuid + '-pj" download>JSON</a></p>'
+        sectionPrimerLink.innerHTML = rHTML
+        rHTML = ""
         if (prStart != 0) {
-            rHTML += '<button type="button" class="btn btn-secondary" onclick="primerUp()">Up</button>'
+            showElement(btnPrimerUp)
+        } else {
+            hideElement(btnPrimerUp)
         }
         var prStop = prStart + step
         var morePrim = 1
@@ -221,10 +280,14 @@ function updateResults() {
             rHTML += '</p>'
         }
         if (morePrim == 1) {
-            rHTML += '<button type="button" class="btn btn-secondary" onclick="primerDown()">Down</button>'
-	}
+            showElement(btnPrimerDown)
+        } else {
+            hideElement(btnPrimerDown)
+        }
+    } else {
+        sectionPrimerLink.innerHTML = ""
     }
-    sectionPrimers.innerHTML = '<br />' + rHTML + '<br />'
+    sectionPrimerData.innerHTML = '<br />' + rHTML + '<br />'
 }
 
 function ampUp() {

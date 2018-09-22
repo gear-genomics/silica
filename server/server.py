@@ -167,7 +167,7 @@ def generate():
             alldata += '"primer":' + prData
         else:
             alldata += '"primer":[]'
-    alldata += ', "link":"' + '/' + uuidstr + '"'
+    alldata += ', "uuid":"' + uuidstr + '"'
     alldata += '}'
     return jsonify(data = json.loads(alldata)), 200
 
@@ -197,16 +197,12 @@ def results(uuid):
                                     alldata += '"primer":' + prData
                                 else:
                                     alldata += '"primer":[]'
-                            alldata += ', "link":"' + '/' + uuid + '"'
+                            alldata += ', "uuid":"' + uuid + '"'
                             alldata += '}'
                             return jsonify(data = json.loads(alldata)), 200
     return jsonify(errors = [{"title": "Link outdated or invalid!"}]), 400
 
-@app.route('/api/v1/<uuid>')
-def link(uuid):
-    return send_from_directory(os.path.join(SILICAWS, "../client/src"),"index.html"), 200
-
-@app.route('/api/v1/genomeindex')
+@app.route('/api/v1/genomeindex', methods=['POST'])
 def genomeind():
     return send_from_directory(os.path.join(SILICAWS, "../fm"),"genomeindexindex.json"), 200
 
