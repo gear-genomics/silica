@@ -1,3 +1,4 @@
+# Silica
 In-silico PCR on complete genomes.
 
 Installing
@@ -21,17 +22,49 @@ Running
 
 `./src/silica -g hg19.fa.gz sequences.fasta`
 
-Install Web Interface
----------------------
+
+Setup and run the server
+------------------------
+
+The server runs in a terminal
+
+Install the dependencies:
 
 `sudo apt install python python-pip`
 
-`pip install flask`
+`pip install flask flask_cors`
 
-Running local
--------------
+Start the server:
 
-`cd ws`
+`cd PATH_TO_SILICA/silica`
 
-`python silica.py -b "" -dt`
+`python server/server.py`
+
+Setup and run the client
+------------------------
+
+The client requires a different terminal
+
+Install the dependencies:
+
+`cd PATH_TO_SILICA/silica/client`
+
+`sudo apt install npm`
+
+`sudo npm install -g parcel-bundler`
+
+`sudo npm install babel-install`
+
+`sudo npm install --save-dev babel-core`
+
+`sudo npm install --save-dev babel-plugin-transform-runtime`
+
+`sudo npm install --save babel-runtime`
+
+Start the client:
+
+`cd PATH_TO_SILICA/silica/client`
+
+`npm run dev`
+
 

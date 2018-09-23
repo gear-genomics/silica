@@ -194,10 +194,10 @@ function updateResults() {
         rHTML += '<div class="alert alert-warning" role="alert"><strong>No Primer Binding Sites Found!</strong></div>\n'
     }
     else {
-        rHTML += '<p>Link to this result page:<br />\n'
-        rHTML += '<a href="' + `${API_LINK}` + res.data.uuid + '">' + `${API_LINK}` + res.data.uuid + '</a></p>\n'
+        rHTML += '<div class="alert alert-success" role="alert"><strong> ' + primecount + ' Primer Binding Sites Found!</strong></div>\n'
     }
-    rHTML += '<div class="alert alert-success" role="alert"><strong> ' + primecount + ' Primer Binding Sites Found!</strong></div>\n'
+    rHTML += '<p>Link to this result page:<br />\n'
+    rHTML += '<a href="' + `${API_LINK}` + res.data.uuid + '">' + `${API_LINK}` + res.data.uuid + '</a></p>\n'
     sectionResults.innerHTML = '<br />' + rHTML + '<br />'
     rHTML = ""
     if (ampcount > 0) {
