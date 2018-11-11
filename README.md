@@ -51,15 +51,7 @@ Install the dependencies:
 
 `sudo apt install npm`
 
-`sudo npm install -g parcel-bundler`
-
-`sudo npm install babel-install`
-
-`sudo npm install --save-dev babel-core`
-
-`sudo npm install --save-dev babel-plugin-transform-runtime`
-
-`sudo npm install --save babel-runtime`
+`sudo npm install`
 
 Start the client:
 

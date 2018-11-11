@@ -5,6 +5,7 @@ src/silica
 src/sdslLite/
 fm/
 data/
+server/run.sh
 ws/nohup.out
 *.pyc
 

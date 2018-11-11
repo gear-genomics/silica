@@ -51,11 +51,7 @@ $('#resTab a').on('click', function (e) {
 var spinnerHtml = '<p>Analysis takes a couple of seconds to run, please be patient.</p><i class="fa fa-spinner fa-pulse fa-3x fa-fw"></i><br /><br />'
 
 document.addEventListener("DOMContentLoaded", function() {
-    var path = window.location.pathname
-    var uuid = path.substring(path.indexOf("/")+1)
-    if (uuid != "") {
-        loadLink(uuid)
-    }
+    checkForUUID();
 });
 
 function goToHelp() {
@@ -134,7 +130,7 @@ function run() {
         })
 }
 
-async function handleSuccess(data) {
+function handleSuccess(data) {
     hideElement(resultInfo)
     hideElement(resultError)
     showElement(resultTabs)
@@ -151,13 +147,17 @@ function hideElement(element) {
   element.classList.add('d-none')
 }
 
-function loadLink (uuid) {
+function checkForUUID() {  
+  var path = window.location.search; // .pathname;
+  if (path.match(/UUID=.+/)) {
     resultLink.click()
 
     hideElement(resultError)
     showElement(resultInfo)
     hideElement(resultTabs)
     hideElement(sectionResults)
+
+    var uuid = path.split("UUID=")[1];
 
     axios
         .get(`${API_URL}/results/` + uuid)
@@ -177,6 +177,7 @@ function loadLink (uuid) {
             showElement(resultError)
             resultError.querySelector('#error-message').textContent = errorMessage
         })
+  }
 }
 
 function updateResults() {
@@ -197,7 +198,7 @@ function updateResults() {
         rHTML += '<div class="alert alert-success" role="alert"><strong> ' + primecount + ' Primer Binding Sites Found!</strong></div>\n'
     }
     rHTML += '<p>Link to this result page:<br />\n'
-    rHTML += '<a href="' + `${API_LINK}` + res.data.uuid + '">' + `${API_LINK}` + res.data.uuid + '</a></p>\n'
+    rHTML += '<a href="' + `${API_LINK}` + "index.html?UUID=" + res.data.uuid + '">' + `${API_LINK}` + "index.html?UUID=" + res.data.uuid + '</a></p>\n'
     sectionResults.innerHTML = '<br />' + rHTML + '<br />'
     rHTML = ""
     if (ampcount > 0) {
