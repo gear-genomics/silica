@@ -138,7 +138,7 @@ def generate():
                 if float(setCtmDNTP) < 0.0:
                     return jsonify(errors = [{"title": "Concentration of the Sum of All dNTPs must be >= 0.0 mMol"}]), 400
 
-                slexe = os.path.join(app.config['SILICA'], "./src/silica")
+                slexe = os.path.join(app.config['SILICA'], "/opt/dev/dicey/bin/dicey")
                 try: 
                     return_code = call([slexe, '-g', genome, '-o', outfile, '-p', prfile,
                                                '--maxProdSize', setAmpSize, '--cutTemp', setTmCutoff,
@@ -150,9 +150,9 @@ def generate():
                                                '-f', 'jsoncsv', ffaname], stdout=log, stderr=err)
                 except OSError as e:
                     if e.errno == os.errno.ENOENT:
-                        return jsonify(errors = [{"title": "Binary ./silica not found!"}]), 400
+                        return jsonify(errors = [{"title": "Binary dicey not found!"}]), 400
                     else:
-                        return jsonify(errors = [{"title": "OSError " + str(e.errno)  + " running binary ./silica!"}]), 400
+                        return jsonify(errors = [{"title": "OSError " + str(e.errno)  + " running binary dicey!"}]), 400
 
     if return_code != 0:
         errInfo = "!"
