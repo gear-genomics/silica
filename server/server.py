@@ -138,7 +138,7 @@ def generate():
                 if float(setCtmDNTP) < 0.0:
                     return jsonify(errors = [{"title": "Concentration of the Sum of All dNTPs must be >= 0.0 mMol"}]), 400
 
-                slexe = os.path.join(app.config['SILICA'], "/opt/dev/dicey/bin/dicey")
+                slexe = os.path.join(app.config['SILICA'], "dicey")
                 try: 
                     return_code = call([slexe, '-g', genome, '-o', outfile, '-p', prfile,
                                                '--maxProdSize', setAmpSize, '--cutTemp', setTmCutoff,
