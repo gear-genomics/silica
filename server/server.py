@@ -18,7 +18,6 @@ SILICAWS = os.path.dirname(os.path.abspath(__file__))
 app.config['SILICA'] = os.path.join(SILICAWS, "..")
 app.config['UPLOAD_FOLDER'] = os.path.join(app.config['SILICA'], "data")
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024   #maximum of 8MB
-app.config['BASEURL'] = '/silica'
 app.static_folder = app.static_url_path = os.path.join(SILICAWS, "../client/src/static")
 
 def allowed_file(filename):
@@ -211,6 +210,10 @@ def results(uuid):
 @app.route('/api/v1/genomeindex', methods=['POST'])
 def genomeind():
     return send_from_directory(os.path.join(SILICAWS, "../fm"),"genomeindexindex.json"), 200
+
+@app.route('/api/v1/health', methods=['GET'])
+def health():
+    return jsonify(status="OK")
 
 def onlyFloat(txt):
     onlyNumbDC = re.compile('[^0-9,.\-]')
