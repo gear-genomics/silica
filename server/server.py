@@ -6,6 +6,7 @@ import re
 import subprocess
 import argparse
 import json
+import gzip
 from subprocess import call
 from flask import Flask, send_file, flash, send_from_directory, request, redirect, url_for, jsonify
 from flask_cors import CORS
@@ -18,7 +19,6 @@ SILICAWS = os.path.dirname(os.path.abspath(__file__))
 app.config['SILICA'] = os.path.join(SILICAWS, "..")
 app.config['UPLOAD_FOLDER'] = os.path.join(app.config['SILICA'], "data")
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024   #maximum of 8MB
-app.static_folder = app.static_url_path = os.path.join(SILICAWS, "../client/src/static")
 
 def allowed_file(filename):
    return '.' in filename and filename.rsplit('.', 1)[1].lower() in set(['fasta', 'fa', 'json', 'csv', 'txt'])
@@ -81,8 +81,7 @@ def generate():
     genome = os.path.join(app.config['SILICA'], "fm", genome)
 
     # Run silica
-    outfile = os.path.join(sf, "silica_" + uuidstr + "_amplicons")
-    prfile = os.path.join(sf, "silica_" + uuidstr + "_primer")
+    outfile = os.path.join(sf, "silica_" + uuidstr + ".json.gz")
     paramfile = os.path.join(sf, "silica_" + uuidstr + "_parameter.txt")
     logfile = os.path.join(sf, "silica_" + uuidstr + ".log")
     errfile = os.path.join(sf, "silica_" + uuidstr + ".err")
@@ -137,16 +136,15 @@ def generate():
                 if float(setCtmDNTP) < 0.0:
                     return jsonify(errors = [{"title": "Concentration of the Sum of All dNTPs must be >= 0.0 mMol"}]), 400
 
-                slexe = os.path.join(app.config['SILICA'], "dicey")
                 try: 
-                    return_code = call([slexe, '-g', genome, '-o', outfile, '-p', prfile,
+                    return_code = call(['dicey', 'search', '-g', genome, '-o', outfile, '-i', os.path.join(SILICAWS, "../primer3_config/"), 
                                                '--maxProdSize', setAmpSize, '--cutTemp', setTmCutoff,
                                                '--kmer', setKmer, '--distance', setEDis,
                                                '--cutoffPenalty', setCutoffPen, '--penaltyTmDiff', setPenTmDiff,
                                                '--penaltyTmMismatch', setPenTmMismatch, '--penaltyLength', setPenLength,
                                                '--monovalent', setCtmMv, '--divalent', setCtmDv,
                                                '--dna', setCtmDNA, '--dntp', setCtmDNTP,
-                                               '-f', 'jsoncsv', ffaname], stdout=log, stderr=err)
+                                               ffaname], stdout=log, stderr=err)
                 except OSError as e:
                     if e.errno == os.errno.ENOENT:
                         return jsonify(errors = [{"title": "Binary dicey not found!"}]), 400
@@ -158,23 +156,8 @@ def generate():
         with open(errfile, "r") as err:
             errInfo = ": " + err.read()
         return jsonify(errors = [{"title": "Error in running silica" + errInfo}]), 400
-    alldata = '{'
-    with open(outfile + ".json") as amp:
-        ampData = amp.read()
-        if len(ampData) > 0:
-            alldata += '"amplicon":' + ampData
-        else:
-            alldata += '"amplicon":[]'
-    alldata += ','
-    with open(prfile + ".json") as pr:
-        prData = pr.read()
-        if len(prData) > 0:
-            alldata += '"primer":' + prData
-        else:
-            alldata += '"primer":[]'
-    alldata += ', "uuid":"' + uuidstr + '"'
-    alldata += '}'
-    return jsonify(data = json.loads(alldata)), 200
+    datajs = json.loads(gzip.open(outfile).read())
+    return jsonify(datajs)
 
 
 @app.route('/api/v1/results/<uuid>', methods = ['GET', 'POST'])

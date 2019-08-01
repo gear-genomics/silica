@@ -182,8 +182,8 @@ function checkForUUID() {
 
 function updateResults() {
     var rHTML = ""
-    var ampcount = res.data.amplicon.length
-    var primecount = res.data.primer.length
+    var ampcount = res.data.amplicons.length
+    var primecount = res.data.primers.length
     if (ampcount == 0) {
         rHTML += '<div class="alert alert-warning" role="alert"><strong>No Amplicons Found!</strong></div>\n'
 	primerLink.click()
@@ -218,7 +218,7 @@ function updateResults() {
             amStop = ampcount
         }
         for (var i = amStart; i < amStop; i++) {
-            var amp = res.data.amplicon[i]
+            var amp = res.data.amplicons[i]
             rHTML += '<h3>Amplicon ' + (parseInt(amp['Id']) + 1) +'</h3>\n<p>'
             rHTML += '<strong>Length:</strong> ' + amp['Length'] +' bp<br />\n'
             rHTML += '<strong>Penalty:</strong> ' + amp['Penalty'] +'<br />\n'
@@ -267,7 +267,7 @@ function updateResults() {
             prStop = primecount
         }
         for (var i = prStart; i < prStop; i++) {
-            var prim = res.data.primer[i]
+            var prim = res.data.primers[i]
             rHTML += '<h3>Primer Binding Site ' + (parseInt(prim['Id']) + 1) +'</h3>\n<p>'
             rHTML += '<strong>Primer Tm:</strong> ' + prim['Tm'] +'&deg;C<br />\n'
             if (prim['Ori'] == 'reverse') {
