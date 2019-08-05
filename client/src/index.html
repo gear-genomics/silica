@@ -146,6 +146,24 @@
       </div>
 
       <div class="tab-pane" id="result-tab">
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label for="inputJsonFile">
+                Load JSON file (<code>.json</code>)
+              </label>
+              <input type="file" class="form-control-file" id="inputJsonFile">
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <button type="submit" class="btn btn-outline-primary" id="btn-save-Json">
+                <i class="far fa-save" style="margin-right: 5px;"></i>
+                Download all (JSON)
+              </button>
+            </div>
+          </div>
+        </div>
         <div id="result-info" class="alert alert-info d-none" role="alert">
           <i class="fas fa-spinner spinner"></i>
           Analysis is running, please be patient.

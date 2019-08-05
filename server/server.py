@@ -20,39 +20,14 @@ app.config['SILICA'] = os.path.join(SILICAWS, "..")
 app.config['UPLOAD_FOLDER'] = os.path.join(app.config['SILICA'], "data")
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024   #maximum of 8MB
 
+
 def allowed_file(filename):
    return '.' in filename and filename.rsplit('.', 1)[1].lower() in set(['fasta', 'fa', 'json', 'csv', 'txt'])
+
 
 uuid_re = re.compile(r'(^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-{0,1}([ap]{0,1})([cj]{0,1})$')
 def is_valid_uuid(s):
    return uuid_re.match(s) is not None
-
-@app.route('/api/v1/download/<uuid>')
-def download(uuid):
-   if is_valid_uuid(uuid):
-      ma = uuid_re.match(uuid)
-      filename = "silica_" + ma.group(1)
-      downName = "silica"
-      if ma.group(2) == 'a':
-         filename += "_amplicons"
-         downName += "_amplicons"
-      else:
-         filename += "_primer"
-         downName += "_primer"
-      if ma.group(3) == 'c':
-         filename += ".csv"
-         downName += ".csv"
-         miType = 'text/csv'
-      else:
-         filename += ".json"
-         downName += ".json"
-         miType = 'text/json'
-      if allowed_file(filename):
-         sf = os.path.join(app.config['UPLOAD_FOLDER'], uuid[0:2])
-         if os.path.exists(sf):
-            if os.path.isfile(os.path.join(sf, filename)):
-               return send_file(os.path.join(sf, filename), mimetype=miType, as_attachment=True, attachment_filename=downName)
-   return "File does not exist!"
 
 
 @app.route('/api/v1/upload', methods=['POST'])
@@ -136,8 +111,8 @@ def generate():
                 if float(setCtmDNTP) < 0.0:
                     return jsonify(errors = [{"title": "Concentration of the Sum of All dNTPs must be >= 0.0 mMol"}]), 400
 
-                try: 
-                    return_code = call(['dicey', 'search', '-g', genome, '-o', outfile, '-i', os.path.join(SILICAWS, "../primer3_config/"), 
+                try:
+                    return_code = call(['dicey', 'search', '-g', genome, '-o', outfile, '-i', os.path.join(SILICAWS, "../primer3_config/"),
                                                '--maxProdSize', setAmpSize, '--cutTemp', setTmCutoff,
                                                '--kmer', setKmer, '--distance', setEDis,
                                                '--cutoffPenalty', setCutoffPen, '--penaltyTmDiff', setPenTmDiff,
@@ -149,15 +124,23 @@ def generate():
                     if e.errno == os.errno.ENOENT:
                         return jsonify(errors = [{"title": "Binary dicey not found!"}]), 400
                     else:
-                        return jsonify(errors = [{"title": "OSError " + str(e.errno)  + " running binary dicey!"}]), 400
-
-    if return_code != 0:
-        errInfo = "!"
-        with open(errfile, "r") as err:
-            errInfo = ": " + err.read()
-        return jsonify(errors = [{"title": "Error in running silica" + errInfo}]), 400
-    datajs = json.loads(gzip.open(outfile).read())
-    return jsonify(datajs)
+                        return jsonify(errors = [{"title": "OSError " + str(e.errno) + " running binary dicey!"}]), 400
+    result = gzip.open(outfile).read()
+    if result is None:
+        datajs = []
+        datajs["errors"] = []
+    else:
+        datajs = json.loads(result)
+    datajs['uuid'] = uuidstr
+    with open(errfile, "r") as err:
+        errInfo = ": " + err.read()
+        if len(errInfo) > 3 or return_code != 0:
+            if len(errInfo) > 3:
+                datajs["errors"] = [{"title": "Error in running silica" + errInfo}] + datajs["errors"]
+            if return_code != 0:
+                datajs["errors"] = [{"title": "Rune Error - Dicey did not return 0"}] + datajs["errors"]
+            return jsonify(datajs), 400
+    return jsonify(datajs), 200
 
 
 @app.route('/api/v1/results/<uuid>', methods = ['GET', 'POST'])
@@ -165,38 +148,33 @@ def results(uuid):
     if is_valid_uuid(uuid):
         sf = os.path.join(app.config['UPLOAD_FOLDER'], uuid[0:2])
         if os.path.exists(sf):
-            ampfilename = "silica_" + uuid + "_amplicons.json";
-            if allowed_file(ampfilename):
-                if os.path.isfile(os.path.join(sf, ampfilename)):
-                    primfilename = "silica_" + uuid + "_primer.json";
-                    if allowed_file(primfilename):
-                        if os.path.isfile(os.path.join(sf, primfilename)):
-                            alldata = '{'
-                            with open(os.path.join(sf, ampfilename)) as amp:
-                                ampData = amp.read()
-                                if len(ampData) > 0:
-                                    alldata += '"amplicon":' + ampData
-                                else:
-                                    alldata += '"amplicon":[]'
-                            alldata += ','
-                            with open(os.path.join(sf, primfilename)) as pr:
-                                prData = pr.read()
-                                if len(prData) > 0:
-                                    alldata += '"primer":' + prData
-                                else:
-                                    alldata += '"primer":[]'
-                            alldata += ', "uuid":"' + uuid + '"'
-                            alldata += '}'
-                            return jsonify(data = json.loads(alldata)), 200
+            sjsfilename = "silica_" + uuid + ".json.gz"
+            if os.path.isfile(os.path.join(sf, sjsfilename)):
+                result = gzip.open(os.path.join(sf, sjsfilename)).read()
+                if result is None:
+                    datajs = []
+                    datajs["errors"] = []
+                else:
+                    datajs = json.loads(result)
+                datajs['uuid'] = uuid
+                with open(os.path.join(sf, "silica_" + uuid + ".err"), "r") as err:
+                    errInfo = ": " + err.read()
+                    if len(errInfo) > 3:
+                        datajs["errors"] = [{"title": "Error in running silica" + errInfo}] + datajs["errors"]
+                        return jsonify(datajs), 400
+                return jsonify(datajs), 200
     return jsonify(errors = [{"title": "Link outdated or invalid!"}]), 400
+
 
 @app.route('/api/v1/genomeindex', methods=['POST'])
 def genomeind():
     return send_from_directory(os.path.join(SILICAWS, "../fm"),"genomeindexindex.json"), 200
 
+
 @app.route('/api/v1/health', methods=['GET'])
 def health():
     return jsonify(status="OK")
+
 
 def onlyFloat(txt):
     onlyNumbDC = re.compile('[^0-9,.\-]')
@@ -204,11 +182,11 @@ def onlyFloat(txt):
     txt = txt.replace(',', '.')
     return txt
 
+
 def onlyInt(txt):
     onlyNumb = re.compile('[^0-9\-]')
     return onlyNumb.sub( '', txt)
 
+
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', port=3300, debug = True, threaded=True)
-
-                                                                        

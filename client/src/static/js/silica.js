@@ -6,6 +6,8 @@ var prStart = 0
 var amStart = 0
 var step = 30
 
+window.data = ""
+
 var fileLoad = document.getElementById('fasta');
 fileLoad.addEventListener('change', loadFasta, false);
 var submitButton = document.getElementById('btn-submit')
@@ -15,6 +17,10 @@ sampleButton.addEventListener('click', sampleData)
 var helpButton = document.getElementById('btn-help')
 helpButton.addEventListener('click', goToHelp)
 
+const saveButton = document.getElementById('btn-save-Json')
+saveButton.addEventListener('click', saveJsonFile)
+const loadJFile = document.getElementById('inputJsonFile')
+loadJFile.addEventListener('change', loadJsonFile, false);
 
 const resultLink = document.getElementById('link-results')
 const helpLink = document.getElementById('link-help')
@@ -114,7 +120,8 @@ function run() {
         .post(`${API_URL}/upload`, formData)
         .then(res => {
             if (res.status === 200) {
-                handleSuccess(res.data)
+                window.data = res.data
+                handleSuccess()
             }
         })
         .catch(err => {
@@ -130,12 +137,11 @@ function run() {
         })
 }
 
-function handleSuccess(data) {
+function handleSuccess() {
     hideElement(resultInfo)
     hideElement(resultError)
     showElement(resultTabs)
     showElement(sectionResults)
-    res = data
     updateResults()
 }
 
@@ -163,7 +169,8 @@ function checkForUUID() {
         .get(`${API_URL}/results/` + uuid)
         .then(res => {
             if (res.status === 200) {
-                handleSuccess(res.data)
+                window.data = res.data
+                handleSuccess(window.data)
             }
         })
         .catch(err => {
@@ -182,6 +189,7 @@ function checkForUUID() {
 
 function updateResults() {
     var rHTML = ""
+    var res = window.data
     var ampcount = res.data.amplicons.length
     var primecount = res.data.primers.length
     if (ampcount == 0) {
@@ -198,12 +206,13 @@ function updateResults() {
         rHTML += '<div class="alert alert-success" role="alert"><strong> ' + primecount + ' Primer Binding Sites Found!</strong></div>\n'
     }
     rHTML += '<p>Link to this result page:<br />\n'
-    rHTML += '<a href="' + `${API_LINK}` + "index.html?UUID=" + res.data.uuid + '">' + `${API_LINK}` + "index.html?UUID=" + res.data.uuid + '</a></p>\n'
-    sectionResults.innerHTML = '<br />' + rHTML + '<br />'
+    rHTML += '<a href="' + `${API_LINK}` + "index.html?UUID=" + res.uuid + '">' + `${API_LINK}` + "index.html?UUID=" + res.uuid + '</a></p>\n'
+
+    sectionResults.innerHTML = '<br />' + rHTML
     rHTML = ""
     if (ampcount > 0) {
-        rHTML += '<p>Download all as <a href="' + `${API_URL}/download/` + res.data.uuid + '-ac" download>CSV</a>'
-        rHTML += ' or <a href="' + `${API_URL}/download/` + res.data.uuid + '-aj" download>JSON</a></p>'
+        rHTML += '<p><button type="submit" class="btn btn-outline-primary" id="btn-save-amp" onClick="saveAmpAsTSV()">'
+        rHTML += '<i class="fas fa-save" style="margin-right: 5px;"></i>Download Amplicons as TSV</button></p>'
         sectionAmpliconLink.innerHTML = rHTML
         rHTML = ""
         if (amStart != 0) {
@@ -221,13 +230,13 @@ function updateResults() {
             var amp = res.data.amplicons[i]
             rHTML += '<h3>Amplicon ' + (parseInt(amp['Id']) + 1) +'</h3>\n<p>'
             rHTML += '<strong>Length:</strong> ' + amp['Length'] +' bp<br />\n'
-            rHTML += '<strong>Penalty:</strong> ' + amp['Penalty'] +'<br />\n'
+            rHTML += '<strong>Penalty:</strong> ' + amp['Penalty'].toFixed(4) +'<br />\n'
             rHTML += '<strong>Location:</strong> ' + amp['Chrom'] + ':' + amp['ForPos'] + '-' + amp['RevPos']+'<br />\n'
             rHTML += '<strong>Forward Primer Name:</strong> ' + amp['ForName'] +'<br />\n'
-            rHTML += '<strong>Forward Primer Tm:</strong> ' + amp['ForTm'] +'&deg;C<br />\n'
+            rHTML += '<strong>Forward Primer Tm:</strong> ' + amp['ForTm'].toFixed(1) +'&deg;C<br />\n'
             rHTML += '<strong>Forward Primer Sequence:</strong> ' + amp['ForSeq'] +'<br />\n'
             rHTML += '<strong>Reverse Primer Name:</strong> ' + amp['RevName'] +'<br />\n'
-            rHTML += '<strong>Reverse Primer Tm:</strong> ' + amp['RevTm'] +'&deg;C<br />\n'
+            rHTML += '<strong>Reverse Primer Tm:</strong> ' + amp['RevTm'].toFixed(1) +'&deg;C<br />\n'
             rHTML += '<strong>Reverse Primer Sequence:</strong> ' + amp['RevSeq'] +'<br />\n'
             rHTML += '<strong>Amplicon Sequence:</strong><br /><pre>'
             var splitSeq = amp['Seq']
@@ -239,7 +248,7 @@ function updateResults() {
             }
             rHTML += '</pre><br />\n'
             rHTML += '</p>'
-	}
+        }
         if (moreAmp == 1) {
             showElement(btnAmpDown)
         } else {
@@ -251,8 +260,8 @@ function updateResults() {
     sectionAmpliconData.innerHTML = rHTML
     rHTML = ""
     if (primecount > 0) {
-        rHTML += '<p>Download all as <a href="' + `${API_URL}/download/` + res.data.uuid + '-pc" download>CSV</a>'
-        rHTML += ' or <a href="' + `${API_URL}/download/` + res.data.uuid + '-pj" download>JSON</a></p>'
+        rHTML += '<p><button type="submit" class="btn btn-outline-primary" id="btn-save-prim" onClick="savePrimAsTSV()">'
+        rHTML += '<i class="fas fa-save" style="margin-right: 5px;"></i>Download Primers as TSV</button></p>'
         sectionPrimerLink.innerHTML = rHTML
         rHTML = ""
         if (prStart != 0) {
@@ -269,7 +278,7 @@ function updateResults() {
         for (var i = prStart; i < prStop; i++) {
             var prim = res.data.primers[i]
             rHTML += '<h3>Primer Binding Site ' + (parseInt(prim['Id']) + 1) +'</h3>\n<p>'
-            rHTML += '<strong>Primer Tm:</strong> ' + prim['Tm'] +'&deg;C<br />\n'
+            rHTML += '<strong>Primer Tm:</strong> ' + prim['Tm'].toFixed(1) +'&deg;C<br />\n'
             if (prim['Ori'] == 'reverse') {
                 rHTML += '<strong>Location:</strong> ' + prim['Chrom'] + ':' + (parseInt(prim['Pos']) - prim['Seq'].length) + '-' + prim['Pos'] + ' on reverse<br />\n'
             } else {
@@ -311,3 +320,131 @@ function primerDown() {
     updateResults()
 }
 
+window.detectBrowser = detectBrowser;
+function detectBrowser() {
+    var browser = window.navigator.userAgent.toLowerCase();
+    if (browser.indexOf("edge") != -1) {
+        return "edge";
+    }
+    if (browser.indexOf("firefox") != -1) {
+        return "firefox";
+    }
+    if (browser.indexOf("chrome") != -1) {
+        return "chrome";
+    }
+    if (browser.indexOf("safari") != -1) {
+        return "safari";
+    }
+    alert("Unknown Browser: Functionality may be impaired!\n\n" + browser);
+    return browser;
+}
+
+window.saveJsonFile = saveJsonFile;
+function saveJsonFile() {
+    if (window.data == "") {
+        return;
+    }
+    var content = JSON.stringify(window.data);
+    var a = document.createElement("a");
+    document.body.appendChild(a);
+    a.style.display = "none";
+    var blob = new Blob([content], {type: "application/json"});
+    var browser = detectBrowser();
+    if (browser != "edge") {
+	    var url = window.URL.createObjectURL(blob);
+	    a.href = url;
+	    a.download = "silica.json";
+	    a.click();
+	    window.URL.revokeObjectURL(url);
+    } else {
+        window.navigator.msSaveBlob(blob, fileName);
+    }
+    return;
+};
+
+
+window.saveAmpAsTSV = saveAmpAsTSV;
+function saveAmpAsTSV() {
+    if (window.data == "") {
+        return;
+    }
+    var content = "Number\tLength\tPenalty\tLocation\t";
+    content += "Forward Name\tForward Tm\tForward Sequence\t";
+    content += "Reverse Name\tReverse Tm\tReverse Sequence\t";
+    content += "Amplicon Sequence\n";
+    var res = window.data
+    for (var i = 0; i < res.data.amplicons.length; i++) {
+        var amp = res.data.amplicons[i]
+        content += (parseInt(amp['Id']) + 1) + "\t" + amp['Length'] + "\t";
+        content += amp['Penalty'].toFixed(4) + "\t" + amp['Chrom'] + ':' + amp['ForPos'] + '-' + amp['RevPos'] + "\t";
+        content += amp['ForName'] + "\t" + amp['ForTm'].toFixed(1) + "\t" + amp['ForSeq'] + "\t";
+        content += amp['RevName'] + "\t" + amp['RevTm'].toFixed(1) + "\t" + amp['RevSeq'] + "\t";
+        content += amp['Seq'] + "\n";
+    }
+    var a = document.createElement("a");
+    document.body.appendChild(a);
+    a.style.display = "none";
+    var blob = new Blob([content], {type: "text/tab-separated-values"});
+    var browser = detectBrowser();
+    if (browser != "edge") {
+	    var url = window.URL.createObjectURL(blob);
+	    a.href = url;
+	    a.download = "silica_amplicons.tsv";
+	    a.click();
+	    window.URL.revokeObjectURL(url);
+    } else {
+        window.navigator.msSaveBlob(blob, fileName);
+    }
+    return;
+};
+
+
+window.savePrimAsTSV = savePrimAsTSV;
+function savePrimAsTSV() {
+    if (window.data == "") {
+        return;
+    }
+    var content = "Number\tPrimer Tm\tLocation\tStrand\tPrimer Name\tPrimer Sequence\tGenome Sequence\n";
+    var res = window.data
+    for (var i = 0; i < res.data.primers.length; i++) {
+        var prim = res.data.primers[i]
+        content += (parseInt(prim['Id']) + 1) + "\t" + prim['Tm'].toFixed(1) + "\t";
+        if (prim['Ori'] == 'reverse') {
+            content += prim['Chrom'] + ':' + (parseInt(prim['Pos']) - prim['Seq'].length) + '-' + prim['Pos'] + '\treverse\t'
+        } else {
+            content += prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length) + '\tforward\t'
+        }
+        content += prim['Name'] + "\t" + prim['Seq'] + "\t";
+        content += prim['Genome'] + "\n";
+    }
+    var a = document.createElement("a");
+    document.body.appendChild(a);
+    a.style.display = "none";
+    var blob = new Blob([content], {type: "text/tab-separated-values"});
+    var browser = detectBrowser();
+    if (browser != "edge") {
+	    var url = window.URL.createObjectURL(blob);
+	    a.href = url;
+	    a.download = "silica_primers.tsv";
+	    a.click();
+	    window.URL.revokeObjectURL(url);
+    } else {
+        window.navigator.msSaveBlob(blob, fileName);
+    }
+    return;
+};
+
+window.loadJsonFile = loadJsonFile;
+function loadJsonFile(f){
+    var file = f.target.files[0];
+    if (file) { // && file.type.match("text/*")) {
+        var reader = new FileReader();
+        reader.onload = function(event) {
+            window.data = JSON.parse(event.target.result);
+            handleSuccess();
+        }
+        reader.readAsText(file);
+    } else {
+        alert("Error opening file");
+    }
+}
