@@ -1,263 +1,460 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>Silica: in-silico PCR amplification | GEAR</title>
+    <meta name="description" content="in-silico PCR amplification." />
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://use.fontawesome.com/releases/v5.0.6/css/all.css"
+    />
+    <link rel="stylesheet" href="static/css/gear.css" />
+    <link rel="stylesheet" href="static/css/silica.css" />
+  </head>
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <title>Silica: in-silico PCR amplification | GEAR</title>
-  <meta name="description" content="in-silico PCR amplification.">
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.6/css/all.css">
-  <link rel="stylesheet" href="static/css/gear.css">
-  <link rel="stylesheet" href="static/css/silica.css">
-</head>
-
-<body>
-
-  <header class="px-0 py-4">
-    <div class="container">
-      <h1 class="display-4 app-name">Silica</h1>
-      <p class="lead">in-silico PCR amplification.</p>
+  <body>
+    <header class="px-0 py-4">
+      <div class="container">
+        <h1 class="display-4 app-name">Silica</h1>
+        <p class="lead">in-silico PCR amplification.</p>
         <!--<a class="plain" href="" target="_blank">
           <i class="fas fa-book"></i> Docs
         </a>
         ·-->
-        <a class="plain" href="https://www-db.embl.de/EMBLPersonGroup-PersonPicture/MailForm/?recipient=ggenomics" target="_blank">
+        <a
+          class="plain"
+          href="https://www-db.embl.de/EMBLPersonGroup-PersonPicture/MailForm/?recipient=ggenomics"
+          target="_blank"
+        >
           <i class="fas fa-question"></i> Get help
         </a>
         ·
-        <a class="plain" target="_blank" href="https://github.com/gear-genomics/silica">
+        <a
+          class="plain"
+          target="_blank"
+          href="https://github.com/gear-genomics/silica"
+        >
           <i class="fab fa-github-alt"></i> Source
         </a>
-    </div>
-  </header>
+      </div>
+    </header>
 
-  <main class="container">
-    <ul class="nav nav-fill mb-2" id="mainTab">
-      <li class="nav-item">
-        <a class="nav-link active" href="#input-tab">Input</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="#settings-tab" id="link-settings">Settings</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="#result-tab" id="link-results">Results</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="#help-tab" id="link-help">Help</a>
-      </li>
-    </ul>
-    <div class="tab-content" id="main-tabs">
-      <div class="tab-pane show active" id="input-tab">
-        <div class="form-group">
-          <label for="fastaText">Paste primers in Fasta format</label>
-          <br />
-          <textarea class="form-control" id="fastaText" name="fastaText" rows="8" cols="50"></textarea>
-        </div>
-        <div class="alert alert-light mb-2" role="alert">
-          <i class="fas fa-info-circle"></i>
-            or upload Fasta file (.fa)<br>
-          <input type="file" class="btn btn-default btn-file" name="fasta" id="fasta" />
-        </div>
-        <div class="alert alert-primary mb-2" role="alert">
-           and select genome
-          <div class="tab-pane fade active show" id="target-genome">
-            <select class="form-control" id="genome-select">
-              <option value=0 selected>Genomes not loaded!</option>
-            </select>
+    <main class="container">
+      <ul class="nav nav-fill mb-2" id="mainTab">
+        <li class="nav-item">
+          <a class="nav-link active" href="#input-tab">Input</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#settings-tab" id="link-settings"
+            >Settings</a
+          >
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#result-tab" id="link-results">Results</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#help-tab" id="link-help">Help</a>
+        </li>
+      </ul>
+      <div class="tab-content" id="main-tabs">
+        <div class="tab-pane show active" id="input-tab">
+          <div class="form-group">
+            <label for="fastaText">Paste primers in Fasta format</label>
+            <br />
+            <textarea
+              class="form-control"
+              id="fastaText"
+              name="fastaText"
+              rows="8"
+              cols="50"
+            ></textarea>
           </div>
-        </div>
-        <br />
-        <div class="form-group">
-          <label for="setAmpSize">Maximum Size of PCR Product (bp)</label>
-          <br />
-          <input class="form-control" type="number" value="15000" id="setAmpSize" name="setAmpSize" />
-        </div>
-        <div class="form-group">
-          <label for="setTmCutoff">Minimal Primer Tm to Consider (&deg;C)</label>
-          <br />
-          <input class="form-control" type="text" value="45.0" id="setTmCutoff" name="setTmCutoff" />
-        </div>
-        <button type="submit" class="btn btn-outline-primary" id="btn-submit">
-          <i class="fas fa-rocket" style="margin-right: 5px;"></i>
-          Launch Analysis
-        </button>
-        <button type="submit" class="btn btn-outline-primary" id="btn-example">
-          <i class="fas fa-eye" style="margin-right: 5px;"></i>
-          Load Example
-        </button>
-        <button type="submit" class="btn btn-outline-primary" id="btn-help">
-          <i class="far fa-life-ring" style="margin-right: 5px;"></i>
-          Help
-        </button>
-      </div>
-
-      <div class="tab-pane" id="settings-tab">
-        <div class="form-group">
-          <label for="setKmer">Number of bp from the 3' End of the Primer Used to Seach for Matches (&gt;14)</label>
-          <br />
-          <input class="form-control" type="number" value="15" id="setKmer" name="setKmer" />
-        </div>
-        <div class="form-group">
-          <label for="setDist">Maximal Allowed Number of Mutations in Matching Sequence (0 or 1)</label>
-          <br />
-          <input class="form-control" type="number" value="1" id="setDist" name="setDist" />
-        </div>
-        <div class="form-group">
-          <label for="setCutoffPen">Keep Only PCR Products with Penalty Below (-1 = keep all)</label>
-          <br />
-          <input class="form-control" type="text" value="-1" id="setCutoffPen" name="setCutoffPen" />
-        </div>
-        <div class="form-group">
-          <label for="setPenTmDiff">Penalty Factor for Single Primer Tm Mismatch to optimal Tm</label>
-          <br />
-          <input class="form-control" type="text" value="0.6" id="setPenTmDiff" name="setPenTmDiff" />
-        </div>
-        <div class="form-group">
-          <label for="setPenTmMismatch">Penalty Factor for Tm Mismatch of Primers in a Pair</label>
-          <br />
-          <input class="form-control" type="text" value="0.4" id="setPenTmMismatch" name="setPenTmMismatch" />
-        </div>
-        <div class="form-group">
-          <label for="setPenLength">Penalty Factor for PCR Product Length</label>
-          <br />
-          <input class="form-control" type="text" value="0.001" id="setPenLength" name="setPenLength" />
-        </div>
-        <div class="form-group">
-          <label for="setCtmMv">Tm Calculation: Concentration of Monovalent Ions (mMol)</label>
-          <br />
-          <input class="form-control" type="text" value="50.0" id="setCtmMv" name="setCtmMv" />
-        </div>
-        <div class="form-group">
-          <label for="setCtmDv">Tm Calculation: Concentration of Divalent Ions (mMol)</label>
-          <br />
-          <input class="form-control" type="text" value="1.5" id="setCtmDv" name="setCtmDv" />
-        </div>
-        <div class="form-group">
-          <label for="setCtmDNA">Tm Calculation: Concentration of Annealing(!) Oligos (nMol)</label>
-          <br />
-          <input class="form-control" type="text" value="50.0" id="setCtmDNA" name="setCtmDNA" />
-        </div>
-        <div class="form-group">
-          <label for="setCtmDNTP">Tm Calculation: Concentration of the Sum of All dNTPs (mMol)</label>
-          <br />
-          <input class="form-control" type="text" value="0.6" id="setCtmDNTP" name="setCtmDNTP" />
-        </div>
-      </div>
-
-      <div class="tab-pane" id="result-tab">
-        <div class="row">
-          <div class="col">
-            <div class="form-group">
-              <label for="inputJsonFile">
-                Load JSON file (<code>.json</code>)
-              </label>
-              <input type="file" class="form-control-file" id="inputJsonFile">
+          <div class="alert alert-light mb-2" role="alert">
+            <i class="fas fa-info-circle"></i>
+            or upload Fasta file (.fa)<br />
+            <input
+              type="file"
+              class="btn btn-default btn-file"
+              name="fasta"
+              id="fasta"
+            />
+          </div>
+          <div class="alert alert-primary mb-2" role="alert">
+            and select genome
+            <div class="tab-pane fade active show" id="target-genome">
+              <select class="form-control" id="genome-select">
+                <option value="0" selected>Genomes not loaded!</option>
+              </select>
             </div>
           </div>
-          <div class="col">
-            <div class="form-group">
-              <button type="submit" class="btn btn-outline-primary" id="btn-save-Json">
-                <i class="far fa-save" style="margin-right: 5px;"></i>
-                Download all (JSON)
-              </button>
+          <br />
+          <div class="form-group">
+            <label for="setAmpSize">Maximum Size of PCR Product (bp)</label>
+            <br />
+            <input
+              class="form-control"
+              type="number"
+              value="15000"
+              id="setAmpSize"
+              name="setAmpSize"
+            />
+          </div>
+          <div class="form-group">
+            <label for="setTmCutoff"
+              >Minimal Primer Tm to Consider (&deg;C)</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="text"
+              value="45.0"
+              id="setTmCutoff"
+              name="setTmCutoff"
+            />
+          </div>
+          <button type="submit" class="btn btn-outline-primary" id="btn-submit">
+            <i class="fas fa-rocket" style="margin-right: 5px;"></i>
+            Launch Analysis
+          </button>
+          <button
+            type="submit"
+            class="btn btn-outline-primary"
+            id="btn-example"
+          >
+            <i class="fas fa-eye" style="margin-right: 5px;"></i>
+            Load Example
+          </button>
+          <button type="submit" class="btn btn-outline-primary" id="btn-help">
+            <i class="far fa-life-ring" style="margin-right: 5px;"></i>
+            Help
+          </button>
+        </div>
+
+        <div class="tab-pane" id="settings-tab">
+          <div class="form-group">
+            <label for="setKmer"
+              >Number of bp from the 3' End of the Primer Used to Seach for
+              Matches (&gt;14)</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="number"
+              value="15"
+              id="setKmer"
+              name="setKmer"
+            />
+          </div>
+          <div class="form-group">
+            <label for="setDist"
+              >Maximal Allowed Number of Mutations in Matching Sequence (0 or
+              1)</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="number"
+              value="1"
+              id="setDist"
+              name="setDist"
+            />
+          </div>
+          <div class="form-group">
+            <label for="setCutoffPen"
+              >Keep Only PCR Products with Penalty Below (-1 = keep all)</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="text"
+              value="-1"
+              id="setCutoffPen"
+              name="setCutoffPen"
+            />
+          </div>
+          <div class="form-group">
+            <label for="setPenTmDiff"
+              >Penalty Factor for Single Primer Tm Mismatch to optimal Tm</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="text"
+              value="0.6"
+              id="setPenTmDiff"
+              name="setPenTmDiff"
+            />
+          </div>
+          <div class="form-group">
+            <label for="setPenTmMismatch"
+              >Penalty Factor for Tm Mismatch of Primers in a Pair</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="text"
+              value="0.4"
+              id="setPenTmMismatch"
+              name="setPenTmMismatch"
+            />
+          </div>
+          <div class="form-group">
+            <label for="setPenLength"
+              >Penalty Factor for PCR Product Length</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="text"
+              value="0.001"
+              id="setPenLength"
+              name="setPenLength"
+            />
+          </div>
+          <div class="form-group">
+            <label for="setCtmMv"
+              >Tm Calculation: Concentration of Monovalent Ions (mMol)</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="text"
+              value="50.0"
+              id="setCtmMv"
+              name="setCtmMv"
+            />
+          </div>
+          <div class="form-group">
+            <label for="setCtmDv"
+              >Tm Calculation: Concentration of Divalent Ions (mMol)</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="text"
+              value="1.5"
+              id="setCtmDv"
+              name="setCtmDv"
+            />
+          </div>
+          <div class="form-group">
+            <label for="setCtmDNA"
+              >Tm Calculation: Concentration of Annealing(!) Oligos
+              (nMol)</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="text"
+              value="50.0"
+              id="setCtmDNA"
+              name="setCtmDNA"
+            />
+          </div>
+          <div class="form-group">
+            <label for="setCtmDNTP"
+              >Tm Calculation: Concentration of the Sum of All dNTPs
+              (mMol)</label
+            >
+            <br />
+            <input
+              class="form-control"
+              type="text"
+              value="0.6"
+              id="setCtmDNTP"
+              name="setCtmDNTP"
+            />
+          </div>
+        </div>
+
+        <div class="tab-pane" id="result-tab">
+          <div class="row">
+            <div class="col">
+              <div class="form-group">
+                <label for="inputJsonFile">
+                  Load JSON file (<code>.json</code>)
+                </label>
+                <input
+                  type="file"
+                  class="form-control-file"
+                  id="inputJsonFile"
+                />
+              </div>
+            </div>
+            <div class="col">
+              <div class="form-group">
+                <button
+                  type="submit"
+                  class="btn btn-outline-primary"
+                  id="btn-save-Json"
+                >
+                  <i class="far fa-save" style="margin-right: 5px;"></i>
+                  Download all (JSON)
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="result-info" class="alert alert-info d-none" role="alert">
+            <i class="fas fa-spinner spinner"></i>
+            Analysis is running, please be patient.
+          </div>
+          <div id="result-error" class="alert alert-danger d-none" role="alert">
+            <i class="fas fa-fire"></i>
+            <span id="error-message"></span>
+          </div>
+          <div id="results" class="d-none"></div>
+          <div id="result-tabs" class="d-none">
+            <ul class="nav nav-tabs" id="resTab">
+              <li class="nav-item">
+                <a class="nav-link active" href="#amplicon-tab">Amplicons</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="#primers-tab" id="link-primers"
+                  >Primers</a
+                >
+              </li>
+            </ul>
+            <div class="tab-content" id="res-tabs">
+              <div class="tab-pane show active" id="amplicon-tab">
+                <br />
+                <div id="res-amplicons-link"></div>
+                <button
+                  type="button"
+                  class="btn btn-secondary d-none"
+                  id="res-amplicons-Up"
+                >
+                  Up
+                </button>
+                <div id="res-amplicons-data"></div>
+                <button
+                  type="button"
+                  class="btn btn-secondary d-none"
+                  id="res-amplicons-Down"
+                >
+                  Down
+                </button>
+                <br />
+              </div>
+              <div class="tab-pane" id="primers-tab">
+                <br />
+                <div id="res-primers-link"></div>
+                <button
+                  type="button"
+                  class="btn btn-secondary d-none"
+                  id="res-primers-Up"
+                >
+                  Up
+                </button>
+                <div id="res-primers-data"></div>
+                <button
+                  type="button"
+                  class="btn btn-secondary d-none"
+                  id="res-primers-Down"
+                >
+                  Down
+                </button>
+                <br />
+              </div>
             </div>
           </div>
         </div>
-        <div id="result-info" class="alert alert-info d-none" role="alert">
-          <i class="fas fa-spinner spinner"></i>
-          Analysis is running, please be patient.
+
+        <div class="tab-pane" id="help-tab">
+          <h4>Application Description</h4>
+          <p>
+            Silica runs a virtual insilico PCR with a set of primers on a
+            selected genome. Multiple primer pairs are allowed, off target
+            products will be shown if present. All primer combinations are
+            tested, provided sufficiend binding to the DNA and reasonable
+            amplicon size.
+          </p>
+          <h4>Accepted Input</h4>
+          <p>
+            Primers can be provided in fasta format or uploaded as a fasta file
+            (*.fa).
+          </p>
+          <h4>Sample Data</h4>
+          <p>
+            The "Load Example" button loads an example primer set. Hit "Launch
+            Analysis" to try the functionality.
+          </p>
         </div>
-        <div id="result-error" class="alert alert-danger d-none" role="alert">
-          <i class="fas fa-fire"></i>
-          <span id="error-message"></span>
+      </div>
+    </main>
+
+    <footer>
+      <div class="container">
+        <div class="float-left">
+          <a class="plain" target="_blank" href="https://gear-genomics.com">
+            GEAR ~
+            <i class="fas fa-home"></i>
+          </a>
+          ·
+          <a
+            class="plain"
+            target="_blank"
+            href="https://github.com/gear-genomics"
+          >
+            <i class="fab fa-github-alt"></i>
+          </a>
+          ·
+          <a
+            class="plain"
+            target="_blank"
+            href="https://gear-genomics.com/terms"
+          >
+            Terms of Use
+          </a>
+          ·
+          <a
+            class="plain"
+            target="_blank"
+            href="https://gear-genomics.com/contact"
+          >
+            Contact Us
+          </a>
         </div>
-        <div id="results" class="d-none"></div>
-        <div id="result-tabs" class="d-none">
-           <ul class="nav nav-tabs" id="resTab">
-            <li class="nav-item">
-              <a class="nav-link active" href="#amplicon-tab">Amplicons</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="#primers-tab" id="link-primers">Primers</a>
-            </li>
-          </ul>
-          <div class="tab-content" id="res-tabs">
-            <div class="tab-pane show active" id="amplicon-tab">
-              <br />
-              <div id="res-amplicons-link"></div>
-              <button type="button" class="btn btn-secondary d-none" id="res-amplicons-Up">Up</button>
-              <div id="res-amplicons-data"></div>
-              <button type="button" class="btn btn-secondary d-none" id="res-amplicons-Down">Down</button>
-              <br />
-            </div>
-            <div class="tab-pane" id="primers-tab">
-              <br />
-              <div id="res-primers-link"></div>  
-              <button type="button" class="btn btn-secondary d-none" id="res-primers-Up">Up</button>
-              <div id="res-primers-data"></div>
-              <button type="button" class="btn btn-secondary d-none" id="res-primers-Down">Down</button>
-              <br />
-            </div>
-	  </div>
-	</div>
+        <div class="float-right">
+          Supported by
+          <a class="plain" target="_blank" href="https://www.embl.de/">
+            <img
+              class="footer-logo"
+              alt="EMBL logo"
+              src="static/img/embl.svg"
+            />
+          </a>
+        </div>
       </div>
+    </footer>
 
-      <div class="tab-pane" id="help-tab">
-        <h4>Application Description</h4>	
-        <p> Silica runs a virtual insilico PCR with a set of primers on a selected genome. 
-            Multiple primer pairs are allowed, off target products will be shown if present.
-            All primer combinations are tested, provided sufficiend binding to the DNA and 
-            reasonable amplicon size.</p>
-        <h4>Accepted Input</h4>
-        <p> Primers can be provided in fasta format or uploaded as a fasta file (*.fa).</p>
-        <h4>Sample Data</h4>
-        <p> The "Load Example" button loads an example primer set. Hit "Launch Analysis" to
-	    try the functionality.</p>
-      </div>
+    <script
+      src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+      integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+      integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+      integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+      crossorigin="anonymous"
+    ></script>
 
-    </div>
-  </main>
-
-  <footer>
-    <div class="container">
-      <div class="float-left">
-        <a class="plain" target="_blank" href="https://gear.embl.de">
-          GEAR ~
-          <i class="fas fa-home"></i>
-        </a>
-        ·
-        <a class="plain" target="_blank" href="https://github.com/gear-genomics">
-          <i class="fab fa-github-alt"></i>
-        </a>
-        ·
-        <a class="plain" target="_blank" href="https://gear.embl.de/terms">
-          Terms of Use
-        </a>
-        ·
-        <a class="plain" target="_blank" href="https://gear.embl.de/contact">
-          Contact Us
-        </a>
-      </div>
-      <div class="float-right">
-        Hosted with
-        <i class="fas fa-heart embl-red"></i> by
-        <a class="plain" target="_blank" href="https://www.embl.de/">
-          <img class="footer-logo" alt="EMBL logo" src="static/img/embl.svg">
-        </a>
-      </div>
-    </div>
-  </footer>
-
-  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
-
-  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-  <script src="static/js/silica.js"></script>
-  <script src="static/js/genomeIndexSel.js"></script>
-</body>
-
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="static/js/silica.js"></script>
+    <script src="static/js/genomeIndexSel.js"></script>
+  </body>
 </html>
-
-
