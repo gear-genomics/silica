@@ -138,7 +138,7 @@ def generate():
             if len(errInfo) > 3:
                 datajs["errors"] = [{"title": "Error in running silica" + errInfo}] + datajs["errors"]
             if return_code != 0:
-                datajs["errors"] = [{"title": "Rune Error - Dicey did not return 0"}] + datajs["errors"]
+                datajs["errors"] = [{"title": "Run Error - Dicey did not return 0"}] + datajs["errors"]
             return jsonify(datajs), 400
     return jsonify(datajs), 200
 

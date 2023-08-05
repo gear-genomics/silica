@@ -1,6 +1,5 @@
 fm/
 data/
-primer3_config/
 server/run.sh
 ws/nohup.out
 *.pyc
