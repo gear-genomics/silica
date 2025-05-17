@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import os
+import errno
 import uuid
 import re
 import subprocess
@@ -121,7 +122,7 @@ def generate():
                                                '--dna', setCtmDNA, '--dntp', setCtmDNTP,
                                                ffaname], stdout=log, stderr=err)
                 except OSError as e:
-                    if e.errno == os.errno.ENOENT:
+                    if e.errno == errno.ENOENT:
                         return jsonify(errors = [{"title": "Binary dicey not found!"}]), 400
                     else:
                         return jsonify(errors = [{"title": "OSError " + str(e.errno) + " running binary dicey!"}]), 400
@@ -177,14 +178,14 @@ def health():
 
 
 def onlyFloat(txt):
-    onlyNumbDC = re.compile('[^0-9,.\-]')
+    onlyNumbDC = re.compile(r'[^0-9,.\-]')
     txt = onlyNumbDC.sub( '', txt)
     txt = txt.replace(',', '.')
     return txt
 
 
 def onlyInt(txt):
-    onlyNumb = re.compile('[^0-9\-]')
+    onlyNumb = re.compile(r'[^0-9\-]')
     return onlyNumb.sub( '', txt)
 
 

@@ -7,6 +7,17 @@ var amStart = 0
 var step = 30
 
 window.data = ""
+genomeConv = {"Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz": "",
+              "Caenorhabditis_elegans.WBcel235.dna.toplevel.fa.gz": "ce11",
+              "Danio_rerio.GRCz10.dna.toplevel.fa.gz": "danRer10",
+              "Drosophila_melanogaster.BDGP6.dna.toplevel.fa.gz": "dm6",
+              "Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz": "hg19",
+              "Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz": "hg38",
+              "Mus_musculus.GRCm38.dna.primary_assembly.fa.gz": "mm10",
+              "Oryzias_latipes.MEDAKA1.dna.toplevel.fa.gz": "oryLat2",
+              "Saccharomyces_cerevisiae.R64-1-1.dna.toplevel.fa.gz": "sacCer3",
+              "SARS-CoV-2.NC_045512.2.dna.fa.gz": "wuhCor1"}
+geneBro = "https://genome-euro.ucsc.edu/cgi-bin/hgTracks?"
 
 var fileLoad = document.getElementById('fasta');
 fileLoad.addEventListener('change', loadFasta, false);
@@ -29,6 +40,7 @@ const resultError = document.getElementById('result-error')
 const resultTabs = document.getElementById('result-tabs')
 const primerLink = document.getElementById('link-primers')
 const targetGenomes = document.getElementById('target-genome')
+var selectedGenome = ""
 var sectionResults = document.getElementById('results')
 var sectionAmpliconLink = document.getElementById('res-amplicons-link')
 var sectionAmpliconData = document.getElementById('res-amplicons-data')
@@ -96,8 +108,8 @@ function run() {
     resultLink.click()
     const formData = new FormData()
     formData.append('fastaText', document.getElementById('fastaText').value);
-    const genome = targetGenomes.querySelector('option:checked').value
-    formData.append('genome', genome)
+    selectedGenome = targetGenomes.querySelector('option:checked').value
+    formData.append('genome', selectedGenome)
     formData.append('setAmpSize', document.getElementById('setAmpSize').value);
     formData.append('setTmCutoff', document.getElementById('setTmCutoff').value);
     formData.append('setKmer', document.getElementById('setKmer').value);
@@ -192,6 +204,10 @@ function updateResults() {
     var res = window.data
     var ampcount = res.data.amplicons.length
     var primecount = res.data.primers.length
+    var genomeDB = ""
+    if (selectedGenome in genomeConv) {
+        genomeDB = genomeConv[selectedGenome]
+    }
     if (ampcount == 0) {
         rHTML += '<div class="alert alert-warning" role="alert"><strong>No Amplicons Found!</strong></div>\n'
 	primerLink.click()
@@ -229,6 +245,10 @@ function updateResults() {
         for (var i = amStart; i < amStop; i++) {
             var amp = res.data.amplicons[i]
             rHTML += '<h3>Amplicon ' + (parseInt(amp['Id']) + 1) +'</h3>\n<p>'
+            if (genomeDB != "") {
+                rHTML += '<a target="_blank" href="' + geneBro + 'db=' + genomeDB + '&position=chr' + amp['Chrom'] + '%3A'
+                rHTML += amp['ForPos'] + '%2D' + amp['RevPos'] + '">View region in UCSC Genome Browser</a><br />\n'
+            }
             rHTML += '<strong>Length:</strong> ' + amp['Length'] +' bp<br />\n'
             rHTML += '<strong>Penalty:</strong> ' + amp['Penalty'].toFixed(4) +'<br />\n'
             rHTML += '<strong>Location:</strong> ' + amp['Chrom'] + ':' + amp['ForPos'] + '-' + amp['RevPos']+'<br />\n'
@@ -278,12 +298,12 @@ function updateResults() {
         for (var i = prStart; i < prStop; i++) {
             var prim = res.data.primers[i]
             rHTML += '<h3>Primer Binding Site ' + (parseInt(prim['Id']) + 1) +'</h3>\n<p>'
-            rHTML += '<strong>Primer Tm:</strong> ' + prim['Tm'].toFixed(1) +'&deg;C<br />\n'
-            if (prim['Ori'] == 'reverse') {
-                rHTML += '<strong>Location:</strong> ' + prim['Chrom'] + ':' + (parseInt(prim['Pos']) - prim['Seq'].length) + '-' + prim['Pos'] + ' on reverse<br />\n'
-            } else {
-                rHTML += '<strong>Location:</strong> ' + prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length) + ' on forward<br />\n'
+            if (genomeDB != "") {
+                rHTML += '<a target="_blank"href="' + geneBro + 'db=' + genomeDB + '&position=chr' + prim['Chrom'] + '%3A'
+                rHTML += prim['Pos'] + '%2D' + (parseInt(prim['Pos']) + prim['Seq'].length) + '">View region in UCSC Genome Browser</a><br />\n'
             }
+            rHTML += '<strong>Primer Tm:</strong> ' + prim['Tm'].toFixed(1) +'&deg;C<br />\n'
+            rHTML += '<strong>Location:</strong> ' + prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length) + ' on forward<br />\n'
             rHTML += '<strong>Primer Name:</strong> ' + prim['Name'] +'<br />\n'
             rHTML += '<strong>Primer Sequence:</strong> ' + prim['Seq'] +'<br />\n'
             rHTML += '<strong>Genome Sequence:</strong> ' + prim['Genome'] +'<br />\n'
