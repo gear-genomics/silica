@@ -17,7 +17,7 @@ genomeConv = {"Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz": "",
               "Oryzias_latipes.MEDAKA1.dna.toplevel.fa.gz": "oryLat2",
               "Saccharomyces_cerevisiae.R64-1-1.dna.toplevel.fa.gz": "sacCer3",
               "SARS-CoV-2.NC_045512.2.dna.fa.gz": "wuhCor1"}
-geneBro = "https://genome-euro.ucsc.edu/cgi-bin/hgTracks?"
+geneBro = "https://genome.ucsc.edu/cgi-bin/hgTracks?"
 
 var fileLoad = document.getElementById('fasta');
 fileLoad.addEventListener('change', loadFasta, false);
