@@ -7,7 +7,7 @@ var amStart = 0
 var step = 30
 
 window.data = ""
-genomeConv = {"Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz": "",
+var genomeConv = {"Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz": "",
               "Caenorhabditis_elegans.WBcel235.dna.toplevel.fa.gz": "ce11",
               "Danio_rerio.GRCz10.dna.toplevel.fa.gz": "danRer10",
               "Drosophila_melanogaster.BDGP6.dna.toplevel.fa.gz": "dm6",
@@ -17,7 +17,7 @@ genomeConv = {"Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz": "",
               "Oryzias_latipes.MEDAKA1.dna.toplevel.fa.gz": "oryLat2",
               "Saccharomyces_cerevisiae.R64-1-1.dna.toplevel.fa.gz": "sacCer3",
               "SARS-CoV-2.NC_045512.2.dna.fa.gz": "wuhCor1"}
-geneBro = "https://genome.ucsc.edu/cgi-bin/hgTracks?"
+var geneBro = "https://genome.ucsc.edu/cgi-bin/hgTracks?"
 
 var fileLoad = document.getElementById('fasta');
 fileLoad.addEventListener('change', loadFasta, false);
