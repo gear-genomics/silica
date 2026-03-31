@@ -247,11 +247,11 @@ function updateResults() {
             rHTML += '<h3>Amplicon ' + (parseInt(amp['Id']) + 1) +'</h3>\n<p>'
             if (genomeDB != "") {
                 rHTML += '<a target="_blank" href="' + geneBro + 'db=' + genomeDB + '&position=chr' + amp['Chrom'] + '%3A'
-                rHTML += amp['ForPos'] + '%2D' + amp['RevPos'] + '">View region in UCSC Genome Browser</a><br />\n'
+                rHTML += amp['ForPos'] + '%2D' + amp['RevEnd'] + '">View region in UCSC Genome Browser</a><br />\n'
             }
             rHTML += '<strong>Length:</strong> ' + amp['Length'] +' bp<br />\n'
             rHTML += '<strong>Penalty:</strong> ' + amp['Penalty'].toFixed(4) +'<br />\n'
-            rHTML += '<strong>Location:</strong> ' + amp['Chrom'] + ':' + amp['ForPos'] + '-' + amp['RevPos']+'<br />\n'
+            rHTML += '<strong>Location:</strong> ' + amp['Chrom'] + ':' + amp['ForPos'] + '-' + amp['RevEnd']+'<br />\n'
             rHTML += '<strong>Forward Primer Name:</strong> ' + amp['ForName'] +'<br />\n'
             rHTML += '<strong>Forward Primer Tm:</strong> ' + amp['ForTm'].toFixed(1) +'&deg;C<br />\n'
             rHTML += '<strong>Forward Primer Sequence:</strong> ' + amp['ForSeq'] +'<br />\n'
@@ -300,10 +300,10 @@ function updateResults() {
             rHTML += '<h3>Primer Binding Site ' + (parseInt(prim['Id']) + 1) +'</h3>\n<p>'
             if (genomeDB != "") {
                 rHTML += '<a target="_blank"href="' + geneBro + 'db=' + genomeDB + '&position=chr' + prim['Chrom'] + '%3A'
-                rHTML += prim['Pos'] + '%2D' + (parseInt(prim['Pos']) + prim['Seq'].length) + '">View region in UCSC Genome Browser</a><br />\n'
+                rHTML += prim['Pos'] + '%2D' + (parseInt(prim['Pos']) + prim['Seq'].length - 1) + '">View region in UCSC Genome Browser</a><br />\n'
             }
             rHTML += '<strong>Primer Tm:</strong> ' + prim['Tm'].toFixed(1) +'&deg;C<br />\n'
-            rHTML += '<strong>Location:</strong> ' + prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length) + ' on ' + prim['Ori'] + '<br />\n'
+            rHTML += '<strong>Location:</strong> ' + prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length - 1) + ' on ' + prim['Ori'] + '<br />\n'
             rHTML += '<strong>Primer Name:</strong> ' + prim['Name'] +'<br />\n'
             rHTML += '<strong>Primer Sequence:</strong> ' + prim['Seq'] +'<br />\n'
             rHTML += '<strong>Genome Sequence:</strong> ' + prim['Genome'] +'<br />\n'
@@ -429,7 +429,7 @@ function savePrimAsTSV() {
     for (var i = 0; i < res.data.primers.length; i++) {
         var prim = res.data.primers[i]
         content += (parseInt(prim['Id']) + 1) + "\t" + prim['Tm'].toFixed(1) + "\t";
-        content += prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length) + '\t' + prim['Ori'] + '\t'
+        content += prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length - 1) + '\t' + prim['Ori'] + '\t'
         content += prim['Name'] + "\t" + prim['Seq'] + "\t";
         content += prim['Genome'] + "\n";
     }
