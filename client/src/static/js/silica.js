@@ -303,7 +303,7 @@ function updateResults() {
                 rHTML += prim['Pos'] + '%2D' + (parseInt(prim['Pos']) + prim['Seq'].length) + '">View region in UCSC Genome Browser</a><br />\n'
             }
             rHTML += '<strong>Primer Tm:</strong> ' + prim['Tm'].toFixed(1) +'&deg;C<br />\n'
-            rHTML += '<strong>Location:</strong> ' + prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length) + ' on forward<br />\n'
+            rHTML += '<strong>Location:</strong> ' + prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length) + ' on ' + prim['Ori'] + '<br />\n'
             rHTML += '<strong>Primer Name:</strong> ' + prim['Name'] +'<br />\n'
             rHTML += '<strong>Primer Sequence:</strong> ' + prim['Seq'] +'<br />\n'
             rHTML += '<strong>Genome Sequence:</strong> ' + prim['Genome'] +'<br />\n'
@@ -429,11 +429,7 @@ function savePrimAsTSV() {
     for (var i = 0; i < res.data.primers.length; i++) {
         var prim = res.data.primers[i]
         content += (parseInt(prim['Id']) + 1) + "\t" + prim['Tm'].toFixed(1) + "\t";
-        if (prim['Ori'] == 'reverse') {
-            content += prim['Chrom'] + ':' + (parseInt(prim['Pos']) - prim['Seq'].length) + '-' + prim['Pos'] + '\treverse\t'
-        } else {
-            content += prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length) + '\tforward\t'
-        }
+        content += prim['Chrom'] + ':' + prim['Pos'] + '-' + (parseInt(prim['Pos']) + prim['Seq'].length) + '\t' + prim['Ori'] + '\t'
         content += prim['Name'] + "\t" + prim['Seq'] + "\t";
         content += prim['Genome'] + "\n";
     }
